@@ -1,5 +1,10 @@
 # Changelog
 
+## v6.8.5 - 2026-04-28
+
+### Fixes
+- context: report output buffer usage (5d4cfdf, moss)
+
 ## v6.8.4 - 2026-04-27
 
 ### Features
