@@ -1,5 +1,10 @@
 # Changelog
 
+## v6.9.1 - 2026-05-07
+
+### Refactors
+- simplify Baidu Qianfan model check and extract model family helpers (d97b1a7, SmallMain)
+
 ## v6.9.0 - 2026-05-02
 
 ### Features
