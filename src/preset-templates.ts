@@ -71,7 +71,7 @@ export function buildPresetTemplateConfigurationSchema(
       ...(enumDescriptions.some((description) => description !== '')
         ? { enumDescriptions }
         : {}),
-      default: template.default,
+      default: resolvePresetTemplateConfigurationDefault(model, template),
       group: 'navigation',
     };
   }
@@ -212,13 +212,83 @@ function resolveSelectedPreset(
 ): PresetTemplatePreset | undefined {
   const configuredId = modelConfiguration?.[template.id];
   if (typeof configuredId === 'string') {
-    const preset = template.presets.find((item) => item.id === configuredId);
-    if (preset) {
-      return preset;
+    return template.presets.find((item) => item.id === configuredId);
+  }
+
+  return undefined;
+}
+
+function resolvePresetTemplateConfigurationDefault(
+  model: ModelConfig,
+  template: PresetTemplate,
+): string {
+  const matchingConfiguredPreset = template.presets.find(
+    (preset) =>
+      !isPresetTemplateOverrideConfigEmpty(preset.config) &&
+      presetOverrideConfigMatchesModel(model, preset.config),
+  );
+  if (matchingConfiguredPreset) {
+    return matchingConfiguredPreset.id;
+  }
+
+  const noOpPreset = template.presets.find((preset) =>
+    isPresetTemplateOverrideConfigEmpty(preset.config),
+  );
+  return noOpPreset?.id ?? template.default;
+}
+
+function isPresetTemplateOverrideConfigEmpty(
+  config: PresetTemplateOverrideConfig,
+): boolean {
+  return PRESET_TEMPLATE_OVERRIDE_KEYS.every((key) => config[key] === undefined);
+}
+
+function presetOverrideConfigMatchesModel(
+  model: ModelConfig,
+  config: PresetTemplateOverrideConfig,
+): boolean {
+  for (const key of PRESET_TEMPLATE_OVERRIDE_KEYS) {
+    const value = config[key];
+    if (value !== undefined && !deepEqualPresetValue(model[key], value)) {
+      return false;
     }
   }
 
-  return template.presets.find((item) => item.id === template.default);
+  return true;
+}
+
+function deepEqualPresetValue(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) {
+    return true;
+  }
+
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) {
+      return false;
+    }
+
+    return a.every((item, index) => deepEqualPresetValue(item, b[index]));
+  }
+
+  if (isRecord(a) || isRecord(b)) {
+    if (!isRecord(a) || !isRecord(b)) {
+      return false;
+    }
+
+    const aKeys = Object.keys(a).filter((key) => a[key] !== undefined);
+    const bKeys = Object.keys(b).filter((key) => b[key] !== undefined);
+    if (aKeys.length !== bKeys.length) {
+      return false;
+    }
+
+    return aKeys.every((key) =>
+      Object.prototype.hasOwnProperty.call(b, key)
+        ? deepEqualPresetValue(a[key], b[key])
+        : false,
+    );
+  }
+
+  return false;
 }
 
 function assignPresetOverrideValue<K extends PresetTemplateOverrideKey>(
