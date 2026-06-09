@@ -40,12 +40,17 @@ import {
 import { registerCommitMessageGeneration } from './commit-message';
 
 const VENDOR_ID = 'unify-chat-provider';
+const EXTENSIONS_CONFIG_NAMESPACE = 'extensions';
+const SUPPORT_AGENTS_WINDOW_SETTING = 'supportAgentsWindow';
+
 /**
  * Extension activation
  */
 export async function activate(
   context: vscode.ExtensionContext,
 ): Promise<void> {
+  await ensureAgentsWindowSupportConfigured(context);
+
   await mainInstance.initialize(context);
   context.subscriptions.push(mainInstance);
 
@@ -495,6 +500,45 @@ export function registerCommands(
  */
 export function deactivate(): void {
   // Cleanup handled by disposables
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+async function ensureAgentsWindowSupportConfigured(
+  context: vscode.ExtensionContext,
+): Promise<void> {
+  try {
+    const config = vscode.workspace.getConfiguration(
+      EXTENSIONS_CONFIG_NAMESPACE,
+    );
+    const inspection = config.inspect<unknown>(SUPPORT_AGENTS_WINDOW_SETTING);
+    const globalValue = inspection?.globalValue;
+    const supportAgentsWindow = isRecord(globalValue) ? globalValue : {};
+    const extensionId = context.extension.id;
+
+    if (supportAgentsWindow[extensionId] === false) {
+      return;
+    }
+    if (supportAgentsWindow[extensionId] === true) {
+      return;
+    }
+
+    await config.update(
+      SUPPORT_AGENTS_WINDOW_SETTING,
+      {
+        ...supportAgentsWindow,
+        [extensionId]: true,
+      },
+      vscode.ConfigurationTarget.Global,
+    );
+  } catch (error) {
+    console.warn(
+      '[UnifyChatProvider] Failed to configure Agents window support:',
+      error,
+    );
+  }
 }
 
 let maintenanceQueue: Promise<void> = Promise.resolve();
