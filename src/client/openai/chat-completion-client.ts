@@ -75,6 +75,7 @@ import { FeatureId } from '../definitions';
  * Identifies which provider-specific API shape to use for reasoning/thinking parameters.
  *
  * - `reasoning`                    — OpenRouter unified `reasoning` object
+ * - `openrouter_claude_adaptive_verbosity` — OpenRouter Claude adaptive thinking + top-level `verbosity`
  * - `thinking`                     — DeepSeek / MiMo / GLM `thinking: { type }` param
  * - `thinking_with_deepseek_reasoning_effort` — DeepSeek V4 `thinking` + `reasoning_effort`
  * - `thinking_with_reasoning_effort` — VolcEngine `thinking` + `reasoning_effort`
@@ -85,6 +86,7 @@ import { FeatureId } from '../definitions';
  */
 type ReasoningParamType =
   | 'reasoning'
+  | 'openrouter_claude_adaptive_verbosity'
   | 'thinking'
   | 'thinking_with_deepseek_reasoning_effort'
   | 'thinking_with_reasoning_effort'
@@ -599,6 +601,15 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
         return { reasoning: { enabled: true } };
       }
 
+      // OpenRouter Claude 4.6/4.7 — adaptive thinking is controlled via
+      // `reasoning.enabled`; effort is controlled by top-level `verbosity`.
+      // @see https://openrouter.ai/docs/cookbook/evaluate-and-optimize/model-migrations/claude-4-7
+      case 'openrouter_claude_adaptive_verbosity': {
+        if (!thinking) return {};
+        if (isDisabled) return { reasoning: { enabled: false } };
+        return { reasoning: { enabled: true } };
+      }
+
       // DeepSeek / MiMo / GLM / Z.AI — `thinking: { type }` only
       // @see https://api-docs.deepseek.com/zh-cn/guides/thinking_mode
       case 'thinking': {
@@ -711,7 +722,22 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
     type: ReasoningParamType,
   ): Record<string, unknown> {
     const thinking = model.thinking;
-    if (type !== 'thinking_with_deepseek_reasoning_effort' || !thinking) {
+    if (!thinking) {
+      return {};
+    }
+
+    if (type === 'openrouter_claude_adaptive_verbosity') {
+      if (this.isThinkingDisabled(thinking) || thinking.effort == null) {
+        return {};
+      }
+      return {
+        verbosity: this.normalizeReasoningEffortForOpenRouterClaude(
+          thinking.effort,
+        ),
+      };
+    }
+
+    if (type !== 'thinking_with_deepseek_reasoning_effort') {
       return {};
     }
     if (this.isThinkingDisabled(thinking) || thinking.effort == null) {
@@ -722,6 +748,26 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
         thinking.effort,
       ),
     };
+  }
+
+  private normalizeReasoningEffortForOpenRouterClaude(
+    effort: NonNullable<NonNullable<ModelConfig['thinking']>['effort']>,
+  ): 'low' | 'medium' | 'high' | 'xhigh' | 'max' {
+    switch (effort) {
+      case 'minimal':
+      case 'low':
+        return 'low';
+      case 'medium':
+        return 'medium';
+      case 'xhigh':
+        return 'xhigh';
+      case 'max':
+        return 'max';
+      case 'high':
+      case 'none':
+      default:
+        return 'high';
+    }
   }
 
   private normalizeThinkingTypeForDeepSeek(
@@ -831,6 +877,11 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
       this.config,
       model,
     );
+    const useOpenRouterClaudeAdaptiveVerbosity = isFeatureSupported(
+      FeatureId.OpenRouterUseClaudeAdaptiveVerbosity,
+      this.config,
+      model,
+    );
     const useThinkingParam = isFeatureSupported(
       FeatureId.OpenAIUseThinkingParam,
       this.config,
@@ -908,7 +959,9 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
     );
 
     let thinkingParamType: ReasoningParamType;
-    if (useReasoningParam) {
+    if (useOpenRouterClaudeAdaptiveVerbosity) {
+      thinkingParamType = 'openrouter_claude_adaptive_verbosity';
+    } else if (useReasoningParam) {
       thinkingParamType = 'reasoning';
     } else if (useThinkingParam) {
       thinkingParamType = useDeepSeekReasoningEffortParam

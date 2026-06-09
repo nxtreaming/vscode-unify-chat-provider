@@ -137,6 +137,16 @@ function modelFamilyIncludes(
   return getModelFamily(model).toLowerCase().includes(expected.toLowerCase());
 }
 
+function modelIdentityIncludes(
+  model: { id: string; family?: string },
+  expected: string,
+): boolean {
+  const normalizedExpected = expected.toLowerCase();
+  return [model.family, getBaseModelId(model.id)].some((value) =>
+    value?.toLowerCase().includes(normalizedExpected),
+  );
+}
+
 export enum FeatureId {
   /**
    * @see https://www.volcengine.com/docs/82379/1569618?lang=zh
@@ -194,6 +204,12 @@ export enum FeatureId {
    * @see https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
    */
   OpenAIUseReasoningParam = 'openai_use-reasoning-param',
+  /**
+   * Use OpenRouter Claude adaptive thinking with top-level `verbosity`.
+   *
+   * @see https://openrouter.ai/docs/cookbook/evaluate-and-optimize/model-migrations/claude-4-7
+   */
+  OpenRouterUseClaudeAdaptiveVerbosity = 'openrouter_use-claude-adaptive-verbosity',
   /**
    * @see https://platform.xiaomimimo.com/#/docs/api/text-generation/openai-api
    * @see https://api-docs.deepseek.com/zh-cn/guides/thinking_mode
@@ -453,6 +469,26 @@ export const FEATURES: Record<FeatureId, Feature> = {
   },
   [FeatureId.OpenAIUseReasoningParam]: {
     supportedProviders: ['openrouter.ai'],
+  },
+  [FeatureId.OpenRouterUseClaudeAdaptiveVerbosity]: {
+    customCheckers: [
+      (model, provider) =>
+        matchProvider(provider.baseUrl, 'openrouter.ai') &&
+        [
+          'claude-opus-4-7',
+          'claude-opus-4.7',
+          'claude-4-7-opus',
+          'claude-4.7-opus',
+          'claude-opus-4-6',
+          'claude-opus-4.6',
+          'claude-4-6-opus',
+          'claude-4.6-opus',
+          'claude-sonnet-4-6',
+          'claude-sonnet-4.6',
+          'claude-4-6-sonnet',
+          'claude-4.6-sonnet',
+        ].some((expected) => modelIdentityIncludes(model, expected)),
+    ],
   },
   [FeatureId.OpenAIUseReasoningDetails]: {
     supportedProviders: ['openrouter.ai', 'api.minimaxi.com', 'api.minimax.io'],
