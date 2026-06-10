@@ -877,11 +877,24 @@ export class UnifyChatService implements vscode.LanguageModelChatProvider {
     }
 
     const tokenizerId = resolveTokenizerId(found?.model.tokenizer);
-    const baseRaw = await TOKENIZERS[tokenizerId].provideTokenCount(
-      model,
-      text,
-      token,
-    );
+    let baseRaw: number;
+    try {
+      baseRaw = await TOKENIZERS[tokenizerId].provideTokenCount(
+        model,
+        text,
+        token,
+      );
+    } catch {
+      try {
+        baseRaw = await TOKENIZERS.default.provideTokenCount(
+          model,
+          text,
+          token,
+        );
+      } catch {
+        baseRaw = 0;
+      }
+    }
     const base =
       typeof baseRaw === 'number' && Number.isFinite(baseRaw) && baseRaw > 0
         ? baseRaw
