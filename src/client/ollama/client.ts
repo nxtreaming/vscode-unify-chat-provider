@@ -548,6 +548,11 @@ export class OllamaProvider implements ApiProvider {
           stream,
           responseTimeoutMs,
           abortController.signal,
+          (error) => {
+            abortController.abort(error);
+            stream?.abort();
+            client.abort();
+          },
         );
         yield* this.parseMessageStream(
           timedStream,

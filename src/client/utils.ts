@@ -20,6 +20,7 @@ import {
   headersInitToRecord,
   normalizeBaseUrlInput,
   normalizeRawBaseUrlInput,
+  runWhenResponseBodySettles,
   type RetryConfig,
 } from '../utils';
 import { FeatureId, FEATURES, PROVIDER_TYPES } from './definitions';
@@ -1040,22 +1041,28 @@ export function createCustomFetch(
 
   const combineAbortSignals = (
     signals: Array<AbortSignal | null | undefined>,
-  ): { signal?: AbortSignal; dispose: () => void } => {
-    const activeSignals: AbortSignal[] = signals.filter(
-      (signal): signal is AbortSignal => signal != null,
+  ): { signal?: AbortSignal; dispose: () => void; hasListeners: boolean } => {
+    const activeSignals = Array.from(
+      new Set(
+        signals.filter((signal): signal is AbortSignal => signal != null),
+      ),
     );
 
     if (activeSignals.length === 0) {
-      return { signal: undefined, dispose: () => {} };
+      return { signal: undefined, dispose: () => {}, hasListeners: false };
     }
 
     if (activeSignals.length === 1) {
-      return { signal: activeSignals[0], dispose: () => {} };
+      return {
+        signal: activeSignals[0],
+        dispose: () => {},
+        hasListeners: false,
+      };
     }
 
     const alreadyAborted = activeSignals.find((signal) => signal.aborted);
     if (alreadyAborted) {
-      return { signal: alreadyAborted, dispose: () => {} };
+      return { signal: alreadyAborted, dispose: () => {}, hasListeners: false };
     }
 
     const controller = new AbortController();
@@ -1079,7 +1086,7 @@ export function createCustomFetch(
       }
     };
 
-    return { signal: controller.signal, dispose };
+    return { signal: controller.signal, dispose, hasListeners: true };
   };
 
   return async (
@@ -1103,6 +1110,7 @@ export function createCustomFetch(
     }
 
     const combined = combineAbortSignals([init?.signal, abortSignal]);
+    let keepAbortLinkForResponseBody = false;
     try {
       const requestInit: RequestInit & { dispatcher?: Dispatcher } = {
         ...init,
@@ -1142,9 +1150,16 @@ export function createCustomFetch(
         }
       }
 
+      if (combined.hasListeners) {
+        keepAbortLinkForResponseBody = true;
+        return runWhenResponseBodySettles(response, combined.dispose);
+      }
+
       return response;
     } finally {
-      combined.dispose();
+      if (!keepAbortLinkForResponseBody) {
+        combined.dispose();
+      }
     }
   };
 }

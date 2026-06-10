@@ -107,6 +107,34 @@ type OpenRouterThinkingOutputState = {
   lastType?: OpenRouterThinkingContentType;
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function hasChoices(value: unknown): boolean {
+  return isRecord(value) && Array.isArray(value['choices']);
+}
+
+function unwrapProviderDataEnvelope<T>(
+  value: T,
+  isExpected: (candidate: unknown) => candidate is T,
+): T {
+  if (!isRecord(value) || hasChoices(value)) {
+    return value;
+  }
+
+  const data = value['data'];
+  return isExpected(data) ? data : value;
+}
+
+function isChatCompletion(value: unknown): value is ChatCompletion {
+  return hasChoices(value);
+}
+
+function isChatCompletionChunk(value: unknown): value is ChatCompletionChunk {
+  return hasChoices(value);
+}
+
 export class OpenAIChatCompletionProvider implements ApiProvider {
   protected readonly baseUrl: string;
 
@@ -1099,6 +1127,7 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
           stream,
           responseTimeoutMs,
           abortController.signal,
+          (error) => abortController.abort(error),
         );
         yield* this.parseMessageStream(
           timedStream,
@@ -1150,10 +1179,7 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
       Date.now() - (performanceTrace.tts + performanceTrace.ttf);
 
     // Some providers wrap the response in a `data` field
-    const response =
-      (message as any).data && !(message as any).choices
-        ? (message as any).data
-        : message;
+    const response = unwrapProviderDataEnvelope(message, isChatCompletion);
     const choice = response.choices[0];
     if (!choice) {
       throw new Error('OpenAI response did not include any choices');
@@ -1386,10 +1412,7 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
 
       logger.providerResponseChunk(JSON.stringify(event));
       // Some providers may wrap chunks in a `data` field
-      const chunk =
-        (event as any).data && !(event as any).choices
-          ? (event as any).data
-          : event;
+      const chunk = unwrapProviderDataEnvelope(event, isChatCompletionChunk);
 
       snapshot = this.accumulateChatCompletion(snapshot, chunk);
       if (chunk.usage) usage = chunk.usage;

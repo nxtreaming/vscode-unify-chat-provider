@@ -1487,6 +1487,7 @@ export class OpenAIResponsesProvider implements ApiProvider {
             stream,
             responseTimeoutMs,
             context.abortController.signal,
+            (error) => context.abortController.abort(error),
           );
           for await (const part of this.parseMessageStream(
             timedStream,

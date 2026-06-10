@@ -74,6 +74,7 @@ export async function exchangeCodeForToken(
   config: OAuth2AuthCodeConfig,
   code: string,
   state: OAuth2AuthState,
+  signal?: AbortSignal,
 ): Promise<OAuth2TokenData> {
   authLog.verbose('oauth2-client', `Exchanging authorization code for token (tokenUrl: ${config.tokenUrl})`);
   const params = new URLSearchParams({
@@ -97,6 +98,7 @@ export async function exchangeCodeForToken(
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: params.toString(),
+    signal,
   });
 
   if (!response.ok) {
@@ -213,13 +215,27 @@ export async function pollDeviceCodeToken(
     device_code: deviceCode,
   });
 
-  const response = await fetch(config.tokenUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: params.toString(),
+  const controller = new AbortController();
+  const cancelSubscription = token.onCancellationRequested(() => {
+    controller.abort();
   });
+  if (token.isCancellationRequested) {
+    controller.abort();
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(config.tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+      signal: controller.signal,
+    });
+  } finally {
+    cancelSubscription.dispose();
+  }
 
   if (token.isCancellationRequested) {
     authLog.verbose('oauth2-client', 'Device code polling cancelled');

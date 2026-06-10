@@ -957,6 +957,10 @@ export class MainInstanceCoordinator implements vscode.Disposable {
     }
 
     if (this.role === 'leader') {
+      if (options?.signal?.aborted) {
+        throw new MainInstanceError('CANCELLED', 'Cancelled');
+      }
+
       const handler = this.handlers.get(method);
       if (!handler) {
         throw new MainInstanceError('NOT_IMPLEMENTED', `Unknown method: ${method}`);
@@ -969,6 +973,10 @@ export class MainInstanceCoordinator implements vscode.Disposable {
 
     if (this.role !== 'follower' || !this.leaderSocket || !this.leaderReady) {
       throw new MainInstanceError('NO_LEADER', 'No leader available');
+    }
+
+    if (options?.signal?.aborted) {
+      throw new MainInstanceError('CANCELLED', 'Cancelled');
     }
 
     const id = randomUUID();
@@ -1001,6 +1009,13 @@ export class MainInstanceCoordinator implements vscode.Disposable {
 
       this.pending.set(id, pending);
       socket.write(serializeMessage(request));
+
+      if (options?.signal?.aborted) {
+        pending.abortListener?.();
+        socket.write(serializeMessage({ type: 'cancel', id }));
+        this.pending.delete(id);
+        reject(new MainInstanceError('CANCELLED', 'Cancelled'));
+      }
     });
 
     return await promise;

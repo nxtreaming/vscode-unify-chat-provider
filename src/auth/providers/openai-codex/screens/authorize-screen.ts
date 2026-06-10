@@ -143,7 +143,9 @@ export async function performOpenAICodexAuthorization(options: {
       const waitResult = await mainInstance.runInLeader<{
         type: 'success';
         url: string;
-      } | { type: 'cancel' }>('oauth.http.wait', { sessionId });
+      } | { type: 'cancel' }>('oauth.http.wait', { sessionId }, {
+        signal: startController.signal,
+      });
 
       if (waitResult.type === 'cancel') {
         return { type: 'cancel' };

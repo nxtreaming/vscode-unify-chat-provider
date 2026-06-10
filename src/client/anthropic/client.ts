@@ -1024,6 +1024,7 @@ export class AnthropicProvider implements ApiProvider {
           sdkStream,
           responseTimeoutMs,
           abortController.signal,
+          (error) => abortController.abort(error),
         );
 
         yield* this.parseMessageStream(

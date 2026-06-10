@@ -554,6 +554,57 @@ export function bodyInitToLoggableValue(
 }
 
 /**
+ * Runs a callback when a response body is consumed, errors, or is cancelled.
+ */
+export function runWhenResponseBodySettles(
+  response: Response,
+  callback: () => void,
+): Response {
+  let settled = false;
+  const settle = (): void => {
+    if (settled) {
+      return;
+    }
+    settled = true;
+    callback();
+  };
+
+  if (!response.body) {
+    settle();
+    return response;
+  }
+
+  const reader = response.body.getReader();
+  const wrappedBody = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        const result = await reader.read();
+        if (result.done) {
+          settle();
+          controller.close();
+          return;
+        }
+
+        controller.enqueue(result.value);
+      } catch (error) {
+        settle();
+        controller.error(error);
+      }
+    },
+    async cancel(reason) {
+      settle();
+      await reader.cancel(reason);
+    },
+  });
+
+  return new Response(wrappedBody, {
+    headers: response.headers,
+    status: response.status,
+    statusText: response.statusText,
+  });
+}
+
+/**
  * Check if an HTTP status code is retryable.
  */
 export function isRetryableStatusCode(
@@ -2062,6 +2113,8 @@ export async function fetchWithRetryUsingFetch(
     const timeoutController = new AbortController();
     const existingSignal = fetchOptions.signal;
     let didTimeout = false;
+    let keepAbortLinkForResponseBody = false;
+    let abortLinkCleanedUp = false;
 
     // Combine with existing signal if present
     throwIfAborted(existingSignal);
@@ -2077,6 +2130,24 @@ export async function fetchWithRetryUsingFetch(
         timeoutController.abort(signal.reason);
       }
     }
+
+    const cleanupAbortLink = (): void => {
+      if (abortLinkCleanedUp) {
+        return;
+      }
+      abortLinkCleanedUp = true;
+      if (onExistingAbort && existingSignal) {
+        existingSignal.removeEventListener('abort', onExistingAbort);
+      }
+    };
+
+    const keepAbortLinkUntilBodySettles = (response: Response): Response => {
+      if (!onExistingAbort || !existingSignal) {
+        return response;
+      }
+      keepAbortLinkForResponseBody = true;
+      return runWhenResponseBodySettles(response, cleanupAbortLink);
+    };
 
     const timeoutId = setTimeout(() => {
       didTimeout = true;
@@ -2101,7 +2172,7 @@ export async function fetchWithRetryUsingFetch(
         response.ok ||
         !isRetryableStatusCode(response.status, retryStatusCodes)
       ) {
-        return response;
+        return keepAbortLinkUntilBodySettles(response);
       }
 
       // Retryable status code - decide whether to retry
@@ -2209,8 +2280,8 @@ export async function fetchWithRetryUsingFetch(
       // Other errors (network errors, user abort) should not be retried
       throw error;
     } finally {
-      if (onExistingAbort && existingSignal) {
-        existingSignal.removeEventListener('abort', onExistingAbort);
+      if (!keepAbortLinkForResponseBody) {
+        cleanupAbortLink();
       }
     }
   }
@@ -2237,6 +2308,7 @@ export async function* withIdleTimeout<T>(
   source: AsyncIterable<T>,
   responseTimeoutMs: number,
   abortSignal?: AbortSignal,
+  onTimeout?: (error: Error) => void,
 ): AsyncGenerator<T> {
   const iterator = source[Symbol.asyncIterator]();
   const timeoutMessage = t(
@@ -2303,7 +2375,9 @@ export async function* withIdleTimeout<T>(
         }
 
         if (result.kind === 'timeout') {
-          throw createTimeoutError(timeoutMessage);
+          const timeoutError = createTimeoutError(timeoutMessage);
+          onTimeout?.(timeoutError);
+          throw timeoutError;
         }
 
         // Normal iteration result

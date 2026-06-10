@@ -1009,6 +1009,7 @@ export class GoogleAIStudioProvider implements ApiProvider {
           stream,
           responseTimeoutMs,
           abortController.signal,
+          (error) => abortController.abort(error),
         );
 
         yield* this.parseMessageStream(

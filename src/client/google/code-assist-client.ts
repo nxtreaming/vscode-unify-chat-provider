@@ -2243,6 +2243,7 @@ export abstract class GoogleCodeAssistProvider extends GoogleAIStudioProvider {
               stream,
               responseTimeoutMs,
               abortController.signal,
+              (error) => abortController.abort(error),
             );
 
             for await (const part of this.parseMessageStream(

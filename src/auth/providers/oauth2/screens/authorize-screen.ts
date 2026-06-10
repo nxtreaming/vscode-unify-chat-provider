@@ -30,6 +30,50 @@ import {
 
 const OAUTH_CALLBACK_PATH = '/oauth/callback';
 
+function delayUntil(
+  ms: number,
+  token: vscode.CancellationToken,
+): Promise<void> {
+  if (token.isCancellationRequested) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const finish = (): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      if (timeout !== undefined) {
+        clearTimeout(timeout);
+      }
+      subscription.dispose();
+      resolve();
+    };
+    const subscription = token.onCancellationRequested(finish);
+    timeout = setTimeout(finish, ms);
+  });
+}
+
+function cancellationTokenToAbortSignal(
+  token: vscode.CancellationToken,
+): { signal: AbortSignal; dispose: () => void } {
+  const controller = new AbortController();
+  const subscription = token.onCancellationRequested(() => {
+    controller.abort();
+  });
+  if (token.isCancellationRequested) {
+    controller.abort();
+  }
+
+  return {
+    signal: controller.signal,
+    dispose: () => subscription.dispose(),
+  };
+}
+
 /**
  * Handle the authorization flow based on grant type
  */
@@ -186,11 +230,17 @@ async function performAuthCodeFlow(
           }
 
           // Exchange code for token
-          return await exchangeCodeForToken(
-            { ...config, redirectUri },
-            code,
-            authState,
-          );
+          const abortLink = cancellationTokenToAbortSignal(token);
+          try {
+            return await exchangeCodeForToken(
+              { ...config, redirectUri },
+              code,
+              authState,
+              abortLink.signal,
+            );
+          } finally {
+            abortLink.dispose();
+          }
         } finally {
           cancelSubscription.dispose();
           localCallbackController.dispose();
@@ -450,7 +500,10 @@ async function performDeviceCodeFlow(
           }
 
           // Wait before polling
-          await new Promise((resolve) => setTimeout(resolve, interval));
+          await delayUntil(interval, cancellationToken);
+          if (cancellationToken.isCancellationRequested) {
+            return undefined;
+          }
 
           try {
             const result = await pollDeviceCodeToken(

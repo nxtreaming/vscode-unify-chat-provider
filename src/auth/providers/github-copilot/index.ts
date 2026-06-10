@@ -151,9 +151,51 @@ type PollTokenResult =
   | { kind: 'slow_down'; intervalSeconds?: number }
   | { kind: 'failed'; error: string };
 
+function cancellationTokenToAbortSignal(
+  token: vscode.CancellationToken,
+): { signal: AbortSignal; dispose: () => void } {
+  const controller = new AbortController();
+  const subscription = token.onCancellationRequested(() => {
+    controller.abort();
+  });
+  if (token.isCancellationRequested) {
+    controller.abort();
+  }
+
+  return {
+    signal: controller.signal,
+    dispose: () => subscription.dispose(),
+  };
+}
+
+function delayUntil(ms: number, token: vscode.CancellationToken): Promise<void> {
+  if (token.isCancellationRequested) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const finish = (): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      if (timeout !== undefined) {
+        clearTimeout(timeout);
+      }
+      subscription.dispose();
+      resolve();
+    };
+    const subscription = token.onCancellationRequested(finish);
+    timeout = setTimeout(finish, ms);
+  });
+}
+
 async function pollAccessTokenOnce(
   domain: string,
   deviceCode: string,
+  signal?: AbortSignal,
 ): Promise<PollTokenResult> {
   const url = `https://${domain}/login/oauth/access_token`;
 
@@ -169,6 +211,7 @@ async function pollAccessTokenOnce(
       device_code: deviceCode,
       grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
     }),
+    signal,
   });
 
   const data: unknown = await response.json().catch(async () => {
@@ -595,17 +638,26 @@ export class GitHubCopilotAuthProvider implements AuthProvider {
             !cancellationToken.isCancellationRequested &&
             (expiresAt === undefined || Date.now() < expiresAt)
           ) {
-            await new Promise((resolve) =>
-              setTimeout(
-                resolve,
-                intervalSeconds * 1000 + POLL_SAFETY_BUFFER_MS,
-              ),
+            await delayUntil(
+              intervalSeconds * 1000 + POLL_SAFETY_BUFFER_MS,
+              cancellationToken,
             );
+            if (cancellationToken.isCancellationRequested) {
+              return undefined;
+            }
 
-            const result = await pollAccessTokenOnce(
-              oauthDomain,
-              deviceResponse.deviceCode,
-            );
+            const abortLink =
+              cancellationTokenToAbortSignal(cancellationToken);
+            let result: PollTokenResult;
+            try {
+              result = await pollAccessTokenOnce(
+                oauthDomain,
+                deviceResponse.deviceCode,
+                abortLink.signal,
+              );
+            } finally {
+              abortLink.dispose();
+            }
 
             if (result.kind === 'success') {
               return result;
