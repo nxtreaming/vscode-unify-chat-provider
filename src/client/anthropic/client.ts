@@ -77,6 +77,14 @@ import type { AuthTokenInfo } from '../../auth/types';
 // TODO Context editing support
 type AnthropicThinkingContentType = 'content' | 'encrypted';
 type AnthropicThinkingDisplay = 'summarized' | 'omitted';
+type AnthropicThinkingRequestParam = 'budget_tokens' | 'effort';
+type AnthropicThinkingEffort = NonNullable<
+  NonNullable<ModelConfig['thinking']>['effort']
+>;
+type AnthropicEnabledThinkingEffort = Exclude<AnthropicThinkingEffort, 'none'>;
+type AnthropicOutputEffort = NonNullable<
+  NonNullable<MessageCreateParamsStreaming['output_config']>['effort']
+>;
 
 type AnthropicThinkingOutputState = {
   lastType?: AnthropicThinkingContentType;
@@ -211,6 +219,62 @@ export class AnthropicProvider implements ApiProvider {
       default:
         return undefined;
     }
+  }
+
+  private resolveAnthropicThinkingRequestParam(
+    thinking: ModelConfig['thinking'] | undefined,
+  ): AnthropicThinkingRequestParam | undefined {
+    if (thinking === undefined) {
+      return undefined;
+    }
+
+    const hasBudgetTokens = thinking.budgetTokens !== undefined;
+    const hasEffort = thinking.effort !== undefined;
+
+    if (hasBudgetTokens !== hasEffort) {
+      return hasBudgetTokens ? 'budget_tokens' : 'effort';
+    }
+
+    switch (thinking.type) {
+      case 'enabled':
+        return 'budget_tokens';
+      case 'auto':
+        return 'effort';
+      case 'disabled':
+        return undefined;
+    }
+  }
+
+  private isAnthropicThinkingEnabled(
+    requestParam: AnthropicThinkingRequestParam | undefined,
+    thinking: ModelConfig['thinking'] | undefined,
+  ): boolean {
+    if (requestParam === undefined) {
+      return false;
+    }
+
+    return requestParam === 'budget_tokens' || thinking?.effort !== 'none';
+  }
+
+  private normalizeAnthropicOutputEffort(
+    effort: AnthropicEnabledThinkingEffort,
+    model: ModelConfig,
+  ): AnthropicOutputEffort {
+    if (effort === 'xhigh') {
+      return isFeatureSupported(
+        FeatureId.AnthropicXHighEffort,
+        this.config,
+        model,
+      )
+        ? 'xhigh'
+        : 'max';
+    }
+
+    if (effort === 'minimal') {
+      return 'low';
+    }
+
+    return effort;
   }
 
   /**
@@ -749,9 +813,12 @@ export class AnthropicProvider implements ApiProvider {
         model.capabilities?.imageInput === true ? 'all' : 'discard',
     });
 
-    const thinkingType = model.thinking?.type;
-    const thinkingEnabled =
-      thinkingType === 'enabled' || thinkingType === 'auto';
+    const anthropicThinkingRequestParam =
+      this.resolveAnthropicThinkingRequestParam(model.thinking);
+    const thinkingEnabled = this.isAnthropicThinkingEnabled(
+      anthropicThinkingRequestParam,
+      model.thinking,
+    );
     const thinkingDisplay = this.resolveThinkingDisplay(model, thinkingEnabled);
     const hasTools = (options.tools && options.tools.length > 0) ?? false;
     const stream = model.stream ?? true;
@@ -880,47 +947,37 @@ export class AnthropicProvider implements ApiProvider {
       }
       if (model.thinking !== undefined) {
         const { budgetTokens, effort } = model.thinking;
-        if (thinkingType === 'enabled') {
-          // With interleaved thinking, budget_tokens can exceed max_tokens
-          // For regular thinking, it must be less than max_tokens
-          requestBase.thinking = {
-            type: 'enabled',
-            budget_tokens: this.normalizeThinkingBudget(
-              budgetTokens,
-              requestBase.max_tokens,
-              anthropicInterleavedThinkingEnabled,
-            ),
-            ...(thinkingDisplay ? { display: thinkingDisplay } : {}),
-          };
-        } else if (thinkingType === 'auto') {
-          requestBase.thinking = {
-            type: 'adaptive',
-            ...(thinkingDisplay ? { display: thinkingDisplay } : {}),
-          };
-          if (effort) {
-            requestBase.output_config ??= {};
+        switch (anthropicThinkingRequestParam) {
+          case 'budget_tokens':
+            // With interleaved thinking, budget_tokens can exceed max_tokens.
+            // For regular thinking, it must be less than max_tokens.
+            requestBase.thinking = {
+              type: 'enabled',
+              budget_tokens: this.normalizeThinkingBudget(
+                budgetTokens,
+                requestBase.max_tokens,
+                anthropicInterleavedThinkingEnabled,
+              ),
+              ...(thinkingDisplay ? { display: thinkingDisplay } : {}),
+            };
+            break;
+          case 'effort':
             if (effort === 'none') {
               requestBase.thinking = {
                 type: 'disabled',
               };
-            } else if (effort === 'xhigh') {
-              if (
-                isFeatureSupported(
-                  FeatureId.AnthropicXHighEffort,
-                  this.config,
-                  model,
-                )
-              ) {
-                requestBase.output_config.effort = 'xhigh';
-              } else {
-                requestBase.output_config.effort = 'max';
-              }
-            } else if (effort === 'minimal') {
-              requestBase.output_config.effort = 'low';
             } else {
-              requestBase.output_config.effort = effort;
+              requestBase.thinking = {
+                type: 'adaptive',
+                ...(thinkingDisplay ? { display: thinkingDisplay } : {}),
+              };
+              if (effort !== undefined) {
+                requestBase.output_config ??= {};
+                requestBase.output_config.effort =
+                  this.normalizeAnthropicOutputEffort(effort, model);
+              }
             }
-          }
+            break;
         }
       }
 
