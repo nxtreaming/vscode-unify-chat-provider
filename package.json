@@ -318,6 +318,13 @@
                   "type": "number",
                   "description": "%configuration.networkSettings.retry.jitterFactor.description%",
                   "default": 0.1
+                },
+                "statusCodes": {
+                  "type": "array",
+                  "description": "%configuration.networkSettings.retry.statusCodes.description%",
+                  "items": {
+                    "type": "number"
+                  }
                 }
               }
             }

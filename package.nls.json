@@ -39,6 +39,7 @@
   "configuration.networkSettings.retry.maxDelayMs.description": "Maximum retry delay cap in milliseconds (chat requests).",
   "configuration.networkSettings.retry.backoffMultiplier.description": "Backoff multiplier for exponential retry delay (chat requests).",
   "configuration.networkSettings.retry.jitterFactor.description": "Jitter factor (0-1) to randomize retry delay (chat requests).",
+  "configuration.networkSettings.retry.statusCodes.description": "HTTP status codes that should trigger retries for chat requests. When set, this overrides the default retryable status codes.",
   "configuration.commitMessageGeneration.model.description": "Model selection used for commit message generation.",
   "configuration.commitMessageGeneration.model.vendor.description": "Vendor identifier of the language model used for commit message generation.",
   "configuration.commitMessageGeneration.model.id.description": "Model identifier used for commit message generation.",

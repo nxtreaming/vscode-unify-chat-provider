@@ -39,6 +39,7 @@
   "configuration.networkSettings.retry.maxDelayMs.description": "聊天请求的最大重试延迟上限（毫秒）。",
   "configuration.networkSettings.retry.backoffMultiplier.description": "聊天请求的指数退避倍数。",
   "configuration.networkSettings.retry.jitterFactor.description": "聊天请求的抖动因子（0-1），用于随机化重试延迟。",
+  "configuration.networkSettings.retry.statusCodes.description": "聊天请求中触发重试的 HTTP 状态码。设置后会覆盖默认可重试状态码。",
   "configuration.commitMessageGeneration.model.description": "用于提交消息生成的模型选择。",
   "configuration.commitMessageGeneration.model.vendor.description": "用于提交消息生成的语言模型 vendor 标识。",
   "configuration.commitMessageGeneration.model.id.description": "用于提交消息生成的模型 ID。",

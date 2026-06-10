@@ -821,7 +821,15 @@ const CODE_ASSIST_MULTI_ENDPOINT_RETRY_CONFIG: RetryConfig = {
   jitterFactor: 0.1,
 };
 
-const CODE_ASSIST_PRE_FIRST_PART_STREAM_RETRY_CONFIG: Required<RetryConfig> = {
+type CodeAssistBackoffRetryConfig = {
+  maxRetries: number;
+  initialDelayMs: number;
+  maxDelayMs: number;
+  backoffMultiplier: number;
+  jitterFactor: number;
+};
+
+const CODE_ASSIST_PRE_FIRST_PART_STREAM_RETRY_CONFIG: CodeAssistBackoffRetryConfig = {
   maxRetries: 3,
   initialDelayMs: 1000,
   maxDelayMs: 10000,

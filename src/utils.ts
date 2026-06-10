@@ -107,6 +107,7 @@ export interface RetryConfig {
   maxDelayMs?: number;
   backoffMultiplier?: number;
   jitterFactor?: number;
+  statusCodes?: number[];
 }
 
 export interface ResolvedChatTimeoutConfig {
@@ -120,6 +121,7 @@ export interface ResolvedChatRetryConfig {
   maxDelayMs: number;
   backoffMultiplier: number;
   jitterFactor: number;
+  statusCodes?: number[];
 }
 
 export interface ResolvedChatNetworkConfig {
@@ -188,6 +190,17 @@ function readJitterFactor(value: unknown): number | undefined {
   return n;
 }
 
+function readStatusCodes(value: unknown): number[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  return value.filter(
+    (item): item is number =>
+      typeof item === 'number' && Number.isFinite(item),
+  );
+}
+
 function applyTimeoutOverrides(
   target: ResolvedChatTimeoutConfig,
   raw: unknown,
@@ -223,6 +236,17 @@ function applyRetryOverrides(
 
   const jitterFactor = readJitterFactor(raw['jitterFactor']);
   if (jitterFactor !== undefined) target.jitterFactor = jitterFactor;
+}
+
+function applyGlobalRetryOverrides(
+  target: ResolvedChatRetryConfig,
+  raw: unknown,
+): void {
+  applyRetryOverrides(target, raw);
+  if (!isRecord(raw)) return;
+
+  const statusCodes = readStatusCodes(raw['statusCodes']);
+  if (statusCodes !== undefined) target.statusCodes = statusCodes;
 }
 
 function readConfiguredChatNetworkOverrides(): {
@@ -268,7 +292,7 @@ export function resolveChatNetwork(
 
   const configured = readConfiguredChatNetworkOverrides();
   applyTimeoutOverrides(resolved.timeout, configured.timeout);
-  applyRetryOverrides(resolved.retry, configured.retry);
+  applyGlobalRetryOverrides(resolved.retry, configured.retry);
 
   applyTimeoutOverrides(resolved.timeout, overrides?.timeout);
   applyRetryOverrides(resolved.retry, overrides?.retry);
@@ -434,7 +458,14 @@ export function bodyInitToLoggableValue(
 /**
  * Check if an HTTP status code is retryable.
  */
-export function isRetryableStatusCode(status: number): boolean {
+export function isRetryableStatusCode(
+  status: number,
+  statusCodes?: readonly number[],
+): boolean {
+  if (statusCodes !== undefined) {
+    return statusCodes.includes(status);
+  }
+
   return (
     (RETRYABLE_STATUS_CODES as readonly number[]).includes(status) ||
     status >= 500
@@ -1361,6 +1392,7 @@ export async function fetchWithRetryUsingFetch(
     DEFAULT_NORMAL_RETRY_CONFIG.backoffMultiplier;
   const jitterFactor =
     retryConfig?.jitterFactor ?? DEFAULT_NORMAL_RETRY_CONFIG.jitterFactor;
+  const retryStatusCodes = retryConfig?.statusCodes;
   const connTimeout =
     connectionTimeoutMs ?? DEFAULT_NORMAL_TIMEOUT_CONFIG.connection;
   const timeoutMessage = t('Timeout: Request aborted after {0}ms', connTimeout);
@@ -1404,7 +1436,10 @@ export async function fetchWithRetryUsingFetch(
       clearTimeout(timeoutId);
 
       // If successful or non-retryable error, return immediately
-      if (response.ok || !isRetryableStatusCode(response.status)) {
+      if (
+        response.ok ||
+        !isRetryableStatusCode(response.status, retryStatusCodes)
+      ) {
         return response;
       }
 
