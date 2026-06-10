@@ -1,5 +1,13 @@
 # Changelog
 
+## v7.1.1 - 2026-06-10
+
+### Fixes
+- add retry for stream read errors in chat streaming (de2b7db, SmallMain)
+- improve cancellation and response body lifecycle handling (0164749, SmallMain)
+- disable default image generation tool for Codex and add token count fallback (28e12a1, SmallMain)
+- Ahthropic thinking config handling for effort and budget tokens (59a7d65, SmallMain)
+
 ## v7.1.0 - 2026-06-10
 
 ### Features
