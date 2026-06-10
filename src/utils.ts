@@ -1,5 +1,8 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { isIP } from 'node:net';
+import type { Socket, SocketConnectOpts } from 'node:net';
 import type { ConnectionOptions } from 'node:tls';
+import * as tls from 'node:tls';
 import { DataPartMimeTypes, StatefulMarkerData } from './client/types';
 import type { ProviderHttpLogger } from './logger';
 import { officialModelsManager } from './official-models-manager';
@@ -12,8 +15,15 @@ import type {
   TimeoutConfig,
 } from './types';
 import * as vscode from 'vscode';
-import { EnvHttpProxyAgent, fetch as undiciFetch } from 'undici';
-import type { Dispatcher } from 'undici';
+import {
+  Agent,
+  Dispatcher,
+  EnvHttpProxyAgent,
+  fetch as undiciFetch,
+} from 'undici';
+import type { buildConnector } from 'undici';
+import { SocksClient } from 'socks';
+import type { SocksProxy } from 'socks';
 import { t } from './i18n';
 
 /**
@@ -907,11 +917,119 @@ interface UndiciProxyAgentLikeOptions {
   requestTls?: unknown;
 }
 
+type SocksProxyProtocol =
+  | 'socks:'
+  | 'socks4:'
+  | 'socks4a:'
+  | 'socks5:'
+  | 'socks5h:';
+type ProxyProtocol = 'http:' | 'https:' | SocksProxyProtocol;
+type SocksClientEstablishedEvent = Awaited<
+  ReturnType<typeof SocksClient.createConnection>
+>;
+
+interface ParsedNoProxyEntry {
+  hostname: string;
+  port: number;
+}
+
+interface ParsedSocksProxy {
+  proxy: SocksProxy;
+  url: string;
+}
+
+interface SocksProxyDispatcherOptions {
+  agentOptions: Agent.Options;
+  connect: buildConnector.connector;
+  noProxy: string;
+}
+
 const defaultDispatcherCache = new Map<string, Dispatcher>();
 const proxiedDispatcherCache = new WeakMap<
   Dispatcher,
   Map<string, Dispatcher>
 >();
+
+class SocksProxyDispatcher extends Dispatcher {
+  private readonly directAgent: Agent;
+  private readonly noProxyEntries: ParsedNoProxyEntry[];
+  private readonly noProxyValue: string;
+  private readonly socksAgent: Agent;
+
+  constructor(options: SocksProxyDispatcherOptions) {
+    super();
+    this.noProxyValue = options.noProxy;
+    this.noProxyEntries = parseNoProxyEntries(options.noProxy);
+    this.directAgent = new Agent(options.agentOptions);
+    this.socksAgent = new Agent({
+      ...options.agentOptions,
+      connect: options.connect,
+    });
+  }
+
+  override dispatch(
+    options: Dispatcher.DispatchOptions,
+    handler: Dispatcher.DispatchHandler,
+  ): boolean {
+    const origin = options.origin;
+    if (origin === undefined) {
+      return this.socksAgent.dispatch(options, handler);
+    }
+
+    const url = new URL(origin);
+    const dispatcher = shouldProxyUrl(url, this.noProxyValue, this.noProxyEntries)
+      ? this.socksAgent
+      : this.directAgent;
+    return dispatcher.dispatch(options, handler);
+  }
+
+  override close(callback: () => void): void;
+  override close(): Promise<void>;
+  override close(callback?: () => void): Promise<void> | void {
+    const closePromise = Promise.all([
+      this.directAgent.close(),
+      this.socksAgent.close(),
+    ]).then(() => undefined);
+
+    if (callback !== undefined) {
+      closePromise.then(callback, callback);
+      return;
+    }
+
+    return closePromise;
+  }
+
+  override destroy(callback: () => void): void;
+  override destroy(error: Error | null, callback: () => void): void;
+  override destroy(error?: Error | null): Promise<void>;
+  override destroy(
+    errorOrCallback?: Error | null | (() => void),
+    callback?: () => void,
+  ): Promise<void> | void {
+    const error =
+      typeof errorOrCallback === 'function' ? undefined : errorOrCallback;
+    const closePromise = Promise.all([
+      error === undefined
+        ? this.directAgent.destroy()
+        : this.directAgent.destroy(error),
+      error === undefined
+        ? this.socksAgent.destroy()
+        : this.socksAgent.destroy(error),
+    ]).then(() => undefined);
+
+    if (typeof errorOrCallback === 'function') {
+      closePromise.then(errorOrCallback, errorOrCallback);
+      return;
+    }
+
+    if (callback !== undefined) {
+      closePromise.then(callback, callback);
+      return;
+    }
+
+    return closePromise;
+  }
+}
 
 function readConfiguredHttpProxySupport(value: unknown): HttpProxySupportMode {
   switch (value) {
@@ -1098,6 +1216,415 @@ function hasOwnProperties(value: object): boolean {
   return Object.keys(value).length > 0;
 }
 
+const DEFAULT_CONNECT_TIMEOUT_MS = 10_000;
+const DEFAULT_PROXY_PORTS: Record<string, number> = {
+  'http:': 80,
+  'https:': 443,
+};
+
+function getNoProxyEnv(): string {
+  return process.env.no_proxy ?? process.env.NO_PROXY ?? '';
+}
+
+function getNoProxyValue(settings: ResolvedHttpProxySettings): string {
+  const configuredNoProxy = settings.noProxy.join(',');
+  return configuredNoProxy === '' ? getNoProxyEnv() : configuredNoProxy;
+}
+
+function parseNoProxyEntries(value: string): ParsedNoProxyEntry[] {
+  const entries = value.split(/[,\s]/);
+  const parsedEntries: ParsedNoProxyEntry[] = [];
+
+  for (const entry of entries) {
+    if (!entry) {
+      continue;
+    }
+
+    const parsed = /^(.+):(\d+)$/.exec(entry);
+    parsedEntries.push({
+      hostname: (parsed ? parsed[1] : entry)
+        .replace(/^\*?\./, '')
+        .toLowerCase(),
+      port: parsed ? Number.parseInt(parsed[2], 10) : 0,
+    });
+  }
+
+  return parsedEntries;
+}
+
+function getNoProxyHostname(url: URL): string {
+  return url.host.replace(/:\d*$/, '').toLowerCase();
+}
+
+function getUrlPort(url: URL): number {
+  return Number.parseInt(url.port, 10) || DEFAULT_PROXY_PORTS[url.protocol] || 0;
+}
+
+function shouldProxyUrl(
+  url: URL,
+  noProxyValue: string,
+  noProxyEntries: readonly ParsedNoProxyEntry[],
+): boolean {
+  if (noProxyEntries.length === 0) {
+    return true;
+  }
+  if (noProxyValue === '*') {
+    return false;
+  }
+
+  const hostname = getNoProxyHostname(url);
+  const port = getUrlPort(url);
+
+  for (const entry of noProxyEntries) {
+    if (entry.port !== 0 && entry.port !== port) {
+      continue;
+    }
+    if (hostname === entry.hostname) {
+      return false;
+    }
+    if (hostname.slice(-(entry.hostname.length + 1)) === `.${entry.hostname}`) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function getProxyProtocol(proxy: string | undefined): ProxyProtocol | undefined {
+  if (proxy === undefined) {
+    return undefined;
+  }
+
+  try {
+    const protocol = new URL(proxy).protocol.toLowerCase();
+    if (
+      protocol === 'http:' ||
+      protocol === 'https:' ||
+      protocol === 'socks:' ||
+      protocol === 'socks4:' ||
+      protocol === 'socks4a:' ||
+      protocol === 'socks5:' ||
+      protocol === 'socks5h:'
+    ) {
+      return protocol;
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
+}
+
+function isSocksProxyProtocol(
+  protocol: ProxyProtocol | undefined,
+): protocol is SocksProxyProtocol {
+  return (
+    protocol === 'socks:' ||
+    protocol === 'socks4:' ||
+    protocol === 'socks4a:' ||
+    protocol === 'socks5:' ||
+    protocol === 'socks5h:'
+  );
+}
+
+function normalizeSocketHost(host: string): string {
+  return host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host;
+}
+
+function decodeProxyUrlComponent(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function readProxyAuthorizationCredentials(
+  value: string | undefined,
+): { userId: string; password?: string } | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const basic = /^basic\s+(.+)$/i.exec(value);
+  const decoded = basic
+    ? Buffer.from(basic[1], 'base64').toString('utf8')
+    : value;
+  const separator = decoded.indexOf(':');
+  if (separator <= 0) {
+    return undefined;
+  }
+
+  return {
+    userId: decoded.slice(0, separator),
+    password: decoded.slice(separator + 1),
+  };
+}
+
+function getSocksProxyType(protocol: SocksProxyProtocol): 4 | 5 {
+  return protocol === 'socks4:' || protocol === 'socks4a:' ? 4 : 5;
+}
+
+function readSocksProxy(
+  proxy: string,
+  protocol: SocksProxyProtocol,
+  proxyAuthorization: string | undefined,
+): ParsedSocksProxy {
+  const url = new URL(proxy);
+  const host = normalizeSocketHost(url.hostname);
+  const port = url.port === '' ? 1080 : Number.parseInt(url.port, 10);
+  const socksProxy: SocksProxy = {
+    port,
+    type: getSocksProxyType(protocol),
+  };
+
+  if (isIP(host) === 0) {
+    socksProxy.host = host;
+  } else {
+    socksProxy.ipaddress = host;
+  }
+
+  const urlUserId = decodeProxyUrlComponent(url.username);
+  const urlPassword = decodeProxyUrlComponent(url.password);
+  if (urlUserId !== '') {
+    socksProxy.userId = urlUserId;
+    socksProxy.password = urlPassword;
+  } else {
+    const credentials = readProxyAuthorizationCredentials(proxyAuthorization);
+    if (credentials !== undefined) {
+      socksProxy.userId = credentials.userId;
+      socksProxy.password = credentials.password;
+    }
+  }
+
+  return {
+    proxy: socksProxy,
+    url: proxy,
+  };
+}
+
+function createAgentOptions(
+  base: ResolvedUndiciDispatcherOptions,
+  settings: ResolvedHttpProxySettings,
+): Agent.Options {
+  const options: Agent.Options = {};
+
+  if (base.allowH2 !== undefined) {
+    options.allowH2 = base.allowH2;
+  }
+  if (base.bodyTimeout !== undefined) {
+    options.bodyTimeout = base.bodyTimeout;
+  }
+  if (base.connectTimeout !== undefined) {
+    options.connectTimeout = base.connectTimeout;
+  }
+  if (base.headersTimeout !== undefined) {
+    options.headersTimeout = base.headersTimeout;
+  }
+
+  const connect: ConnectionOptions = {};
+  if (base.requestCA !== undefined) {
+    connect.ca = base.requestCA;
+  }
+  if (!settings.proxyStrictSSL) {
+    connect.rejectUnauthorized = false;
+  }
+  if (hasOwnProperties(connect)) {
+    options.connect = connect;
+  }
+
+  return options;
+}
+
+function getDestinationPort(options: buildConnector.Options): number {
+  if (options.port !== '') {
+    return Number.parseInt(options.port, 10);
+  }
+  return options.protocol === 'https:' ? 443 : 80;
+}
+
+function getTlsServerName(options: buildConnector.Options): string | undefined {
+  const candidate = options.servername ?? normalizeSocketHost(options.hostname);
+  return isIP(candidate) === 0 ? candidate : undefined;
+}
+
+function createSocksTimeoutError(
+  proxyUrl: string,
+  options: buildConnector.Options,
+  timeoutMs: number,
+): Error {
+  const error = new Error(
+    `SOCKS proxy connection timeout after ${timeoutMs}ms: ${proxyUrl} -> ${options.hostname}:${getDestinationPort(options)}`,
+  );
+  Object.defineProperty(error, 'code', {
+    configurable: true,
+    enumerable: false,
+    value: 'ETIMEDOUT',
+    writable: true,
+  });
+  return error;
+}
+
+function configureConnectedSocket(socket: Socket | tls.TLSSocket): void {
+  socket.setNoDelay(true);
+  socket.setKeepAlive(true, 60_000);
+}
+
+function createTlsSocketOverSocks(
+  socket: Socket,
+  options: buildConnector.Options,
+  base: ResolvedUndiciDispatcherOptions,
+  settings: ResolvedHttpProxySettings,
+): Promise<tls.TLSSocket> {
+  return new Promise((resolve, reject) => {
+    const tlsOptions: ConnectionOptions = {
+      ALPNProtocols: base.allowH2 ? ['http/1.1', 'h2'] : ['http/1.1'],
+      ca: base.requestCA,
+      servername: getTlsServerName(options),
+      socket,
+    };
+    if (!settings.proxyStrictSSL) {
+      tlsOptions.rejectUnauthorized = false;
+    }
+
+    const tlsSocket = tls.connect(tlsOptions);
+    const cleanup = (): void => {
+      tlsSocket.removeListener('secureConnect', onSecureConnect);
+      tlsSocket.removeListener('error', onError);
+    };
+    const onSecureConnect = (): void => {
+      cleanup();
+      configureConnectedSocket(tlsSocket);
+      resolve(tlsSocket);
+    };
+    const onError = (error: Error): void => {
+      cleanup();
+      reject(error);
+    };
+
+    tlsSocket.once('secureConnect', onSecureConnect);
+    tlsSocket.once('error', onError);
+  });
+}
+
+function createSocksConnector(
+  socksProxy: ParsedSocksProxy,
+  base: ResolvedUndiciDispatcherOptions,
+  settings: ResolvedHttpProxySettings,
+): buildConnector.connector {
+  return (options, callback): void => {
+    const timeoutMs = base.connectTimeout ?? DEFAULT_CONNECT_TIMEOUT_MS;
+    let settled = false;
+    let activeSocket: Socket | tls.TLSSocket | undefined;
+
+    const settle = (
+      error: Error | null,
+      socket: Socket | tls.TLSSocket | null,
+    ): void => {
+      if (settled) {
+        socket?.destroy();
+        return;
+      }
+
+      settled = true;
+      clearTimeout(timeoutId);
+      if (error !== null) {
+        callback(error, null);
+        return;
+      }
+      if (socket === null) {
+        callback(
+          new Error('SOCKS proxy connection did not return a socket'),
+          null,
+        );
+        return;
+      }
+      callback(null, socket);
+    };
+
+    const timeoutId = setTimeout(() => {
+      activeSocket?.destroy();
+      settle(createSocksTimeoutError(socksProxy.url, options, timeoutMs), null);
+    }, timeoutMs);
+
+    const destination = {
+      host: normalizeSocketHost(options.hostname),
+      port: getDestinationPort(options),
+    };
+
+    const proxyHost = socksProxy.proxy.host ?? socksProxy.proxy.ipaddress;
+    const socketOptions: SocketConnectOpts | undefined =
+      options.localAddress == null || proxyHost === undefined
+        ? undefined
+        : {
+            host: proxyHost,
+            localAddress: options.localAddress,
+            port: socksProxy.proxy.port,
+          };
+
+    void SocksClient.createConnection({
+      command: 'connect',
+      destination,
+      proxy: socksProxy.proxy,
+      set_tcp_nodelay: true,
+      socket_options: socketOptions,
+      timeout: timeoutMs,
+    }).then(
+      (event: SocksClientEstablishedEvent) => {
+        activeSocket = event.socket;
+        configureConnectedSocket(event.socket);
+
+        if (options.protocol !== 'https:') {
+          settle(null, event.socket);
+          return;
+        }
+
+        void createTlsSocketOverSocks(
+          event.socket,
+          options,
+          base,
+          settings,
+        ).then(
+          (tlsSocket) => {
+            activeSocket = tlsSocket;
+            settle(null, tlsSocket);
+          },
+          (error: unknown) => {
+            settle(toError(error), null);
+          },
+        );
+      },
+      (error: unknown) => {
+        settle(toError(error), null);
+      },
+    );
+  };
+}
+
+function createSocksProxyDispatcher(
+  base: ResolvedUndiciDispatcherOptions,
+  settings: ResolvedHttpProxySettings,
+  protocol: SocksProxyProtocol,
+): Dispatcher {
+  const proxy = settings.proxy;
+  if (proxy === undefined) {
+    return new Agent(createAgentOptions(base, settings));
+  }
+
+  const agentOptions = createAgentOptions(base, settings);
+  const socksProxy = readSocksProxy(
+    proxy,
+    protocol,
+    settings.proxyAuthorization,
+  );
+
+  return new SocksProxyDispatcher({
+    agentOptions,
+    connect: createSocksConnector(socksProxy, base, settings),
+    noProxy: getNoProxyValue(settings),
+  });
+}
+
 function createEnvProxyDispatcher(
   originalDispatcher: Dispatcher | undefined,
   settings: ResolvedHttpProxySettings,
@@ -1110,6 +1637,10 @@ function createEnvProxyDispatcher(
   if (originalDispatcher !== undefined && base.socketPath !== undefined) {
     return originalDispatcher;
   }
+
+  const proxyProtocol = getProxyProtocol(settings.proxy);
+  const isSocksProxy = isSocksProxyProtocol(proxyProtocol);
+  const noProxy = settings.noProxy.join(',');
 
   const signature = JSON.stringify({
     allowH2: base.allowH2,
@@ -1124,10 +1655,11 @@ function createEnvProxyDispatcher(
       '',
     envNoProxy: process.env.NO_PROXY ?? process.env.no_proxy ?? '',
     headersTimeout: base.headersTimeout,
-    noProxy: settings.noProxy,
+    noProxy: isSocksProxy ? getNoProxyValue(settings) : settings.noProxy,
     proxy: settings.proxy ?? '',
     proxyAuthorization: settings.proxyAuthorization ?? '',
     proxyCA: base.proxyCA ? 'custom' : '',
+    proxyProtocol: proxyProtocol ?? '',
     proxyStrictSSL: settings.proxyStrictSSL,
     requestCA: base.requestCA ? 'custom' : '',
   });
@@ -1147,6 +1679,12 @@ function createEnvProxyDispatcher(
     return cached;
   }
 
+  if (isSocksProxy) {
+    const dispatcher = createSocksProxyDispatcher(base, settings, proxyProtocol);
+    dispatcherCache.set(signature, dispatcher);
+    return dispatcher;
+  }
+
   const init: EnvProxyDispatcherInit = {};
 
   setIfDefined(init, 'allowH2', base.allowH2);
@@ -1157,7 +1695,6 @@ function createEnvProxyDispatcher(
   setIfDefined(init, 'httpsProxy', settings.proxy);
   setIfDefined(init, 'token', settings.proxyAuthorization);
 
-  const noProxy = settings.noProxy.join(',');
   if (noProxy !== '') {
     init.noProxy = noProxy;
   }
