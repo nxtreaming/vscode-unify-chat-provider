@@ -12,6 +12,26 @@ export interface ContextCacheConfig {
   ttl?: number;
 }
 
+export type ProxyType = 'vscode' | 'direct' | 'custom';
+
+export interface ProxyConfig {
+  /**
+   * Proxy mode.
+   *
+   * Default: `vscode`, which delegates to the next lower-priority layer and
+   * ultimately VS Code's `http.proxy` settings.
+   */
+  type?: ProxyType;
+  /** Custom proxy URL for `custom` mode. */
+  url?: string;
+  /** Optional proxy authorization header or user:password credentials. */
+  authorization?: string;
+  /** Whether to enforce TLS certificate validation for proxied requests. */
+  strictSSL?: boolean;
+  /** Hosts that should bypass the proxy. */
+  noProxy?: string[];
+}
+
 export type ServiceTier = 'auto' | 'standard' | 'flex' | 'scale' | 'priority';
 export type ThinkingEffort =
   | 'max'
@@ -70,6 +90,8 @@ export interface ProviderConfig {
   timeout?: TimeoutConfig;
   /** Retry configuration */
   retry?: RetryConfig;
+  /** Proxy configuration */
+  proxy?: ProxyConfig;
   /** Whether to auto-fetch official models from the provider API */
   autoFetchOfficialModels?: boolean;
   /** Context cache / prompt caching configuration. */

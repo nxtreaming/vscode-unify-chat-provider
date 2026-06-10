@@ -289,6 +289,7 @@ export async function runProviderFormScreen(
           kind: 'timeoutForm',
           timeout: draft.timeout ?? {},
           retry: draft.retry ?? {},
+          proxy: draft.proxy ?? {},
           draft,
         },
       };

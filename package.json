@@ -333,6 +333,46 @@
                   }
                 }
               }
+            },
+            "proxy": {
+              "type": "object",
+              "description": "%configuration.networkSettings.proxy.description%",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "description": "%configuration.proxy.type.description%",
+                  "enum": [
+                    "vscode",
+                    "direct",
+                    "custom"
+                  ],
+                  "default": "vscode",
+                  "enumDescriptions": [
+                    "%configuration.proxy.type.enumDescriptions.0%",
+                    "%configuration.proxy.type.enumDescriptions.1%",
+                    "%configuration.proxy.type.enumDescriptions.2%"
+                  ]
+                },
+                "url": {
+                  "type": "string",
+                  "description": "%configuration.proxy.url.description%"
+                },
+                "authorization": {
+                  "type": "string",
+                  "description": "%configuration.proxy.authorization.description%"
+                },
+                "strictSSL": {
+                  "type": "boolean",
+                  "description": "%configuration.proxy.strictSSL.description%"
+                },
+                "noProxy": {
+                  "type": "array",
+                  "description": "%configuration.proxy.noProxy.description%",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
             }
           }
         },
@@ -758,6 +798,46 @@
                     "type": "number",
                     "description": "%configuration.endpoints.retry.jitterFactor.description%",
                     "default": 0.1
+                  }
+                }
+              },
+              "proxy": {
+                "type": "object",
+                "description": "%configuration.endpoints.proxy.description%",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "description": "%configuration.proxy.type.description%",
+                    "enum": [
+                      "vscode",
+                      "direct",
+                      "custom"
+                    ],
+                    "default": "vscode",
+                    "enumDescriptions": [
+                      "%configuration.proxy.type.enumDescriptions.0%",
+                      "%configuration.proxy.type.enumDescriptions.1%",
+                      "%configuration.proxy.type.enumDescriptions.2%"
+                    ]
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "%configuration.proxy.url.description%"
+                  },
+                  "authorization": {
+                    "type": "string",
+                    "description": "%configuration.proxy.authorization.description%"
+                  },
+                  "strictSSL": {
+                    "type": "boolean",
+                    "description": "%configuration.proxy.strictSSL.description%"
+                  },
+                  "noProxy": {
+                    "type": "array",
+                    "description": "%configuration.proxy.noProxy.description%",
+                    "items": {
+                      "type": "string"
+                    }
                   }
                 }
               },

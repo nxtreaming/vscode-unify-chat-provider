@@ -404,6 +404,7 @@ export class OpenAIResponsesProvider implements ApiProvider {
   ): OpenAI {
     const chatNetwork =
       mode === 'chat' ? resolveChatNetwork(this.config) : undefined;
+    const proxy = chatNetwork?.proxy ?? resolveChatNetwork(this.config).proxy;
     const effectiveTimeout =
       chatNetwork?.timeout ?? DEFAULT_NORMAL_TIMEOUT_CONFIG;
 
@@ -421,6 +422,7 @@ export class OpenAIResponsesProvider implements ApiProvider {
         responseTimeoutMs: effectiveTimeout.response,
         logger,
         retryConfig: chatNetwork?.retry,
+        proxy,
         type: mode,
         abortSignal,
       }),

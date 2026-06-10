@@ -71,6 +71,19 @@ function getTransportModeDescription(draft: ProviderFormDraft): string {
   }
 }
 
+function getProxyDescription(draft: ProviderFormDraft): string | undefined {
+  switch (draft.proxy?.type) {
+    case 'custom':
+      return t('proxy: custom');
+    case 'direct':
+      return t('proxy: direct');
+    case 'vscode':
+      return t('proxy: VS Code');
+    default:
+      return draft.proxy?.url ? t('proxy: custom') : undefined;
+  }
+}
+
 function normalizeProviderBaseUrlForMode(
   value: string,
   useRawBaseUrl: boolean | undefined,
@@ -535,7 +548,8 @@ export const providerFormSchema: FormSchema<ProviderFormDraft> = {
           draft.retry?.backoffMultiplier !== undefined ||
           draft.retry?.jitterFactor !== undefined;
 
-        if (!hasTimeout && !hasRetry) return t('default');
+        const proxyDescription = getProxyDescription(draft);
+        if (!hasTimeout && !hasRetry && !proxyDescription) return t('default');
 
         const parts: string[] = [];
         if (draft.timeout?.connection !== undefined) {
@@ -552,6 +566,10 @@ export const providerFormSchema: FormSchema<ProviderFormDraft> = {
           parts.push(t('retry: internal'));
         } else if (hasRetry) {
           parts.push(t('retry: custom'));
+        }
+
+        if (proxyDescription) {
+          parts.push(proxyDescription);
         }
 
         return parts.join(', ');

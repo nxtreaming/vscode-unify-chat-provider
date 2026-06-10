@@ -352,6 +352,7 @@ export class OpenAICodexProvider extends OpenAIResponsesProvider {
   ): OpenAI {
     const chatNetwork =
       mode === 'chat' ? resolveChatNetwork(this.config) : undefined;
+    const proxy = chatNetwork?.proxy ?? resolveChatNetwork(this.config).proxy;
     const effectiveTimeout =
       chatNetwork?.timeout ?? DEFAULT_NORMAL_TIMEOUT_CONFIG;
 
@@ -364,6 +365,7 @@ export class OpenAICodexProvider extends OpenAIResponsesProvider {
       responseTimeoutMs: effectiveTimeout.response,
       logger,
       retryConfig: chatNetwork?.retry,
+      proxy,
       urlTransformer:
         this.config.auth?.method === 'openai-codex'
           ? rewriteToCodexEndpoint

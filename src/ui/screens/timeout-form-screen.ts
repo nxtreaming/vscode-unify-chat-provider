@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { pickQuickItem } from '../component';
 import { resolveChatNetwork, type ResolvedChatNetworkConfig, type RetryConfig } from '../../utils';
-import type { TimeoutConfig } from '../../types';
+import type { ProxyConfig, ProxyType, TimeoutConfig } from '../../types';
 import type {
   TimeoutFormRoute,
   UiContext,
@@ -20,6 +20,10 @@ type NetworkField =
         | 'maxDelayMs'
         | 'backoffMultiplier'
         | 'jitterFactor';
+    }
+  | {
+      kind: 'proxy';
+      field: 'type' | 'url' | 'authorization' | 'strictSSL' | 'noProxy';
     };
 
 interface NetworkSettingsItem extends vscode.QuickPickItem {
@@ -35,6 +39,7 @@ export async function runTimeoutFormScreen(
 ): Promise<UiNavAction> {
   const timeout = route.timeout;
   const retry = route.retry;
+  const proxy = route.proxy;
   const globalDefaults = resolveChatNetwork(undefined);
   const isCodeAssist =
     route.draft.type === 'google-antigravity' ||
@@ -125,6 +130,50 @@ export async function runTimeoutFormScreen(
       readOnly: isCodeAssist,
     },
     { label: '', kind: vscode.QuickPickItemKind.Separator },
+    {
+      label: `$(globe) ${t('Proxy Type')}`,
+      description: formatProxyType(proxy.type),
+      detail: t('Select whether to use VS Code proxy settings, connect directly, or use a custom proxy'),
+      edit: { kind: 'proxy', field: 'type' },
+    },
+    {
+      label: `$(link) ${t('Proxy URL')}`,
+      description: proxy.url?.trim() || t('Not configured'),
+      detail: t('Used when proxy type is Custom'),
+      edit: { kind: 'proxy', field: 'url' },
+    },
+    {
+      label: `$(key) ${t('Proxy Authorization')}`,
+      description: proxy.authorization?.trim()
+        ? t('Configured')
+        : t('Not configured'),
+      detail: t('Optional proxy authorization header or user:password credentials'),
+      edit: { kind: 'proxy', field: 'authorization' },
+    },
+    {
+      label: `$(shield) ${t('Proxy Strict SSL')}`,
+      description:
+        proxy.strictSSL === undefined
+          ? t('default')
+          : proxy.strictSSL
+            ? t('Enabled')
+            : t('Disabled'),
+      detail: t('Whether to enforce TLS certificate validation for proxied requests'),
+      edit: { kind: 'proxy', field: 'strictSSL' },
+    },
+    {
+      label: `$(list-unordered) ${t('No Proxy')}`,
+      description:
+        proxy.noProxy && proxy.noProxy.length > 0
+          ? t('{0} entries', proxy.noProxy.length)
+          : t('Not configured'),
+      detail:
+        proxy.noProxy && proxy.noProxy.length > 0
+          ? t('Hosts that should bypass the proxy: {0}', proxy.noProxy.join(', '))
+          : t('Hosts that should bypass the proxy'),
+      edit: { kind: 'proxy', field: 'noProxy' },
+    },
+    { label: '', kind: vscode.QuickPickItemKind.Separator },
     { label: `$(refresh) ${t('Reset to Defaults')}`, action: 'reset' },
   ];
 
@@ -138,6 +187,7 @@ export async function runTimeoutFormScreen(
   if (!selection || selection.action === 'back') {
     route.draft.timeout = hasTimeoutValues(timeout) ? timeout : undefined;
     route.draft.retry = hasRetryValues(retry) ? retry : undefined;
+    route.draft.proxy = hasProxyValues(proxy) ? proxy : undefined;
     return { kind: 'pop' };
   }
 
@@ -149,6 +199,11 @@ export async function runTimeoutFormScreen(
     route.retry.maxDelayMs = undefined;
     route.retry.backoffMultiplier = undefined;
     route.retry.jitterFactor = undefined;
+    route.proxy.type = undefined;
+    route.proxy.url = undefined;
+    route.proxy.authorization = undefined;
+    route.proxy.strictSSL = undefined;
+    route.proxy.noProxy = undefined;
     return { kind: 'stay' };
   }
 
@@ -166,8 +221,10 @@ export async function runTimeoutFormScreen(
           ? globalDefaults.timeout.connection
           : globalDefaults.timeout.response;
       await editTimeoutField(timeout, selection.edit.field, defaultValue);
-    } else {
+    } else if (selection.edit.kind === 'retry') {
       await editRetryField(retry, selection.edit.field, globalDefaults.retry);
+    } else {
+      await editProxyField(proxy, selection.edit.field);
     }
   }
 
@@ -232,6 +289,45 @@ function hasRetryValues(retry: RetryConfig): boolean {
   );
 }
 
+function hasProxyValues(proxy: ProxyConfig): boolean {
+  return (
+    proxy.type !== undefined ||
+    proxy.url !== undefined ||
+    proxy.authorization !== undefined ||
+    proxy.strictSSL !== undefined ||
+    (proxy.noProxy !== undefined && proxy.noProxy.length > 0)
+  );
+}
+
+function formatProxyType(type: ProxyType | undefined): string {
+  switch (type) {
+    case 'custom':
+      return t('Custom');
+    case 'direct':
+      return t('Direct');
+    case 'vscode':
+    case undefined:
+      return t('VS Code');
+  }
+}
+
+function isSupportedProxyUrl(value: string): boolean {
+  try {
+    const protocol = new URL(value).protocol.toLowerCase();
+    return (
+      protocol === 'http:' ||
+      protocol === 'https:' ||
+      protocol === 'socks:' ||
+      protocol === 'socks4:' ||
+      protocol === 'socks4a:' ||
+      protocol === 'socks5:' ||
+      protocol === 'socks5h:'
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function editTimeoutField(
   timeout: TimeoutConfig,
   field: 'connection' | 'response',
@@ -270,6 +366,130 @@ async function editTimeoutField(
   } else {
     timeout[field] = Number(input);
   }
+}
+
+async function editProxyField(
+  proxy: ProxyConfig,
+  field: 'type' | 'url' | 'authorization' | 'strictSSL' | 'noProxy',
+): Promise<void> {
+  if (field === 'type') {
+    const picked = await pickQuickItem<
+      vscode.QuickPickItem & { value: ProxyType | undefined }
+    >({
+      title: t('Proxy Type'),
+      placeholder: t('Select proxy type'),
+      ignoreFocusOut: true,
+      items: [
+        {
+          label: t('VS Code'),
+          description: t('Use VS Code proxy settings'),
+          value: 'vscode',
+          picked: proxy.type === undefined || proxy.type === 'vscode',
+        },
+        {
+          label: t('Direct'),
+          description: t('Connect directly without a proxy'),
+          value: 'direct',
+          picked: proxy.type === 'direct',
+        },
+        {
+          label: t('Custom'),
+          description: t('Use a custom HTTP(S) or SOCKS proxy'),
+          value: 'custom',
+          picked: proxy.type === 'custom',
+        },
+        {
+          label: t('Default'),
+          description: t('Clear provider proxy override'),
+          value: undefined,
+        },
+      ],
+    });
+    if (picked) {
+      proxy.type = picked.value;
+    }
+    return;
+  }
+
+  if (field === 'url') {
+    const input = await vscode.window.showInputBox({
+      title: t('Proxy URL'),
+      prompt: t('Enter custom proxy URL'),
+      value: proxy.url ?? '',
+      placeHolder: t('e.g., http://127.0.0.1:7890 or socks5://127.0.0.1:1080'),
+      validateInput: (value) => {
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+        return isSupportedProxyUrl(trimmed)
+          ? null
+          : t('Please enter a valid HTTP(S) or SOCKS proxy URL');
+      },
+    });
+    if (input === undefined) return;
+    const trimmed = input.trim();
+    proxy.url = trimmed || undefined;
+    if (trimmed && proxy.type === undefined) {
+      proxy.type = 'custom';
+    }
+    return;
+  }
+
+  if (field === 'authorization') {
+    const input = await vscode.window.showInputBox({
+      title: t('Proxy Authorization'),
+      prompt: t('Enter proxy authorization header or user:password credentials'),
+      value: proxy.authorization ?? '',
+      password: true,
+    });
+    if (input === undefined) return;
+    proxy.authorization = input.trim() || undefined;
+    return;
+  }
+
+  if (field === 'strictSSL') {
+    const picked = await pickQuickItem<
+      vscode.QuickPickItem & { value: boolean | undefined }
+    >({
+      title: t('Proxy Strict SSL'),
+      placeholder: t('Select strict SSL mode'),
+      ignoreFocusOut: true,
+      items: [
+        {
+          label: t('Default'),
+          description: t('Use VS Code proxyStrictSSL setting'),
+          value: undefined,
+          picked: proxy.strictSSL === undefined,
+        },
+        {
+          label: t('Enabled'),
+          value: true,
+          picked: proxy.strictSSL === true,
+        },
+        {
+          label: t('Disabled'),
+          value: false,
+          picked: proxy.strictSSL === false,
+        },
+      ],
+    });
+    if (picked) {
+      proxy.strictSSL = picked.value;
+    }
+    return;
+  }
+
+  const input = await vscode.window.showInputBox({
+    title: t('No Proxy'),
+    prompt: t('Enter hosts that should bypass the proxy, separated by commas'),
+    value: proxy.noProxy?.join(', ') ?? '',
+    placeHolder: t('e.g., localhost, 127.0.0.1, .example.com'),
+  });
+  if (input === undefined) return;
+  const entries = input
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== '');
+  proxy.noProxy = entries.length > 0 ? entries : undefined;
 }
 
 async function editRetryField(

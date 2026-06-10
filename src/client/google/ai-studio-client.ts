@@ -999,7 +999,11 @@ export class GoogleAIStudioProvider implements ApiProvider {
             contents,
             config: generateConfig,
           });
-        }, { connectionTimeoutMs: requestTimeoutMs, retryConfig: chatNetwork.retry });
+        }, {
+          connectionTimeoutMs: requestTimeoutMs,
+          retryConfig: chatNetwork.retry,
+          proxy: chatNetwork.proxy,
+        });
 
         const timedStream = withIdleTimeout(
           stream,
@@ -1021,7 +1025,11 @@ export class GoogleAIStudioProvider implements ApiProvider {
             contents,
             config: generateConfig,
           });
-        }, { connectionTimeoutMs: requestTimeoutMs, retryConfig: chatNetwork.retry });
+        }, {
+          connectionTimeoutMs: requestTimeoutMs,
+          retryConfig: chatNetwork.retry,
+          proxy: chatNetwork.proxy,
+        });
         yield* this.parseMessage(
           data,
           requestTrace,
@@ -1234,6 +1242,7 @@ export class GoogleAIStudioProvider implements ApiProvider {
     });
     try {
       const client = this.createClient(undefined, false, credential, 'normal');
+      const network = resolveChatNetwork(this.config);
       const result: ModelConfig[] = [];
       const pager = await withGoogleFetchLogger(logger, async () => {
         return client.models.list({
@@ -1244,7 +1253,7 @@ export class GoogleAIStudioProvider implements ApiProvider {
             },
           },
         });
-      });
+      }, { proxy: network.proxy });
       for await (const model of pager) {
         if (model.name) {
           result.push({ id: model.name });
@@ -1262,6 +1271,7 @@ type FetchLoggerContext = {
   logger: ProviderHttpLogger;
   connectionTimeoutMs?: number;
   retryConfig?: RetryConfig;
+  proxy?: ProviderConfig['proxy'];
 };
 
 const fetchLoggerContext = new AsyncLocalStorage<FetchLoggerContext>();
@@ -1347,6 +1357,7 @@ function ensureInstalled(): void {
           logger: ctx.logger,
           retryConfig: ctx.retryConfig,
           connectionTimeoutMs: ctx.connectionTimeoutMs,
+          proxy: ctx.proxy,
         })
       : await baseFetch(input, init);
 
@@ -1381,7 +1392,10 @@ function ensureInstalled(): void {
 async function withGoogleFetchLogger<T>(
   logger: ProviderHttpLogger,
   fn: () => Promise<T>,
-  options?: Pick<FetchLoggerContext, 'connectionTimeoutMs' | 'retryConfig'>,
+  options?: Pick<
+    FetchLoggerContext,
+    'connectionTimeoutMs' | 'retryConfig' | 'proxy'
+  >,
 ): Promise<T> {
   ensureInstalled();
   return fetchLoggerContext.run({ logger, ...options }, fn);

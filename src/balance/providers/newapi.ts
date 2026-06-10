@@ -11,6 +11,7 @@ import type {
   BalanceRefreshInput,
   BalanceRefreshResult,
 } from '../types';
+import type { ProxyConfig } from '../../types';
 import { isNewAPIBalanceConfig } from '../types';
 import type {
   BalanceConfigureResult,
@@ -387,6 +388,7 @@ export class NewAPIBalanceProvider implements BalanceProvider {
         normalizedBaseUrl,
         apiKey,
         logger,
+        input.provider.proxy,
       );
 
       const items: BalanceMetric[] = [];
@@ -414,6 +416,7 @@ export class NewAPIBalanceProvider implements BalanceProvider {
               config.userId.trim(),
               systemToken,
               logger,
+              input.provider.proxy,
             );
             items.push(...userBalance.items);
           } catch (error) {
@@ -454,6 +457,7 @@ export class NewAPIBalanceProvider implements BalanceProvider {
     baseUrl: string,
     apiKey: string,
     logger: ReturnType<typeof createSimpleHttpLogger>,
+    proxy: ProxyConfig | undefined,
   ): Promise<ParsedBalance> {
     const endpoint = new URL('/api/usage/token', `${baseUrl}/`).toString();
 
@@ -464,6 +468,7 @@ export class NewAPIBalanceProvider implements BalanceProvider {
         Accept: 'application/json',
       },
       logger,
+      proxy,
     });
 
     if (!response.ok) {
@@ -551,6 +556,7 @@ export class NewAPIBalanceProvider implements BalanceProvider {
     userId: string,
     systemToken: string,
     logger: ReturnType<typeof createSimpleHttpLogger>,
+    proxy: ProxyConfig | undefined,
   ): Promise<ParsedBalance> {
     const endpoint = new URL('/api/user/self', `${baseUrl}/`).toString();
 
@@ -562,6 +568,7 @@ export class NewAPIBalanceProvider implements BalanceProvider {
         Accept: 'application/json',
       },
       logger,
+      proxy,
     });
 
     if (!response.ok) {

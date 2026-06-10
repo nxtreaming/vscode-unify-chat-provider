@@ -18,7 +18,9 @@ import { normalizeConfiguredModelCapabilities } from './model-capabilities';
 import {
   ContextCacheConfig,
   ModelConfig,
+  ProxyConfig,
   ProviderConfig,
+  ProxyType,
   ServiceTier,
 } from './types';
 
@@ -50,6 +52,7 @@ const OBSERVED_CONFIG_KEYS = [
   'balanceWarning.timeThresholdDays',
   'balanceWarning.amountThreshold',
   'balanceWarning.tokenThresholdMillions',
+  'networkSettings',
 ] as const;
 
 /** Extension configuration stored in VS Code application-scoped user settings. */
@@ -220,6 +223,15 @@ export class ConfigStore {
     };
   }
 
+  get networkProxy(): ProxyConfig | undefined {
+    const raw = this.readConfiguredUnknown('networkSettings');
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return undefined;
+    }
+
+    return this.normalizeProxyConfig((raw as Record<string, unknown>)['proxy']);
+  }
+
   /**
    * Get the full extension configuration
    */
@@ -339,6 +351,7 @@ export class ConfigStore {
     provider.serviceTier = this.normalizeServiceTier(provider.serviceTier);
     provider.extraHeaders = this.normalizeStringRecord(provider.extraHeaders);
     provider.extraBody = this.normalizeObjectRecord(provider.extraBody);
+    provider.proxy = this.normalizeProxyConfig(provider.proxy);
     provider.contextCache = this.normalizeContextCacheConfig(
       provider.contextCache,
     );
@@ -374,6 +387,80 @@ export class ConfigStore {
       default:
         return undefined;
     }
+  }
+
+  private normalizeProxyType(raw: unknown): ProxyType | undefined {
+    return raw === 'vscode' || raw === 'direct' || raw === 'custom'
+      ? raw
+      : undefined;
+  }
+
+  private normalizeProxyUrl(raw: unknown): string | undefined {
+    if (typeof raw !== 'string') {
+      return undefined;
+    }
+
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+
+    try {
+      const protocol = new URL(trimmed).protocol.toLowerCase();
+      return protocol === 'http:' ||
+        protocol === 'https:' ||
+        protocol === 'socks:' ||
+        protocol === 'socks4:' ||
+        protocol === 'socks4a:' ||
+        protocol === 'socks5:' ||
+        protocol === 'socks5h:'
+        ? trimmed
+        : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private normalizeProxyConfig(raw: unknown): ProxyConfig | undefined {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return undefined;
+    }
+
+    const record = raw as Record<string, unknown>;
+    const out: ProxyConfig = {};
+
+    const type = this.normalizeProxyType(record['type']);
+    if (type !== undefined) {
+      out.type = type;
+    }
+
+    const url = this.normalizeProxyUrl(record['url']);
+    if (url !== undefined) {
+      out.url = url;
+    }
+
+    const authorization = record['authorization'];
+    if (typeof authorization === 'string' && authorization.trim()) {
+      out.authorization = authorization.trim();
+    }
+
+    const strictSSL = record['strictSSL'];
+    if (typeof strictSSL === 'boolean') {
+      out.strictSSL = strictSSL;
+    }
+
+    const noProxy = record['noProxy'];
+    if (Array.isArray(noProxy)) {
+      const entries = noProxy
+        .filter((entry): entry is string => typeof entry === 'string')
+        .map((entry) => entry.trim())
+        .filter((entry) => entry !== '');
+      if (entries.length > 0) {
+        out.noProxy = entries;
+      }
+    }
+
+    return Object.keys(out).length > 0 ? out : undefined;
   }
 
   private normalizeContextCacheConfig(

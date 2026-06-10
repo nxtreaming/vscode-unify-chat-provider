@@ -417,6 +417,7 @@ export class KimiCodeBalanceProvider implements BalanceProvider {
           Accept: 'application/json',
         },
         logger,
+        proxy: input.provider.proxy,
       });
 
       if (!response.ok) {

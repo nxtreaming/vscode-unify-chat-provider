@@ -637,9 +637,13 @@ export class BalanceManager implements vscode.Disposable {
     }
 
     try {
+      const providerWithResolvedProxy = {
+        ...provider,
+        proxy: this.resolveProviderProxy(provider),
+      };
       const credential = await this.resolveCredential(provider);
       const result = await balanceProvider.refresh({
-        provider,
+        provider: providerWithResolvedProxy,
         credential,
       });
 
@@ -657,6 +661,26 @@ export class BalanceManager implements vscode.Disposable {
       this.notifyUpdated(provider.name);
       balanceProvider.dispose?.();
     }
+  }
+
+  private resolveProviderProxy(
+    provider: ProviderConfig,
+  ): ProviderConfig['proxy'] {
+    const providerProxy = provider.proxy;
+    if (providerProxy?.type && providerProxy.type !== 'vscode') {
+      return providerProxy;
+    }
+
+    const globalProxy = this.configStore?.networkProxy;
+    if (globalProxy?.type && globalProxy.type !== 'vscode') {
+      return globalProxy;
+    }
+
+    if (globalProxy?.type === 'vscode') {
+      return { type: 'vscode' };
+    }
+
+    return undefined;
   }
 
   private async resolveCredential(

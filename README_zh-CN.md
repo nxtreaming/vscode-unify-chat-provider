@@ -441,7 +441,7 @@ VS Code 的 Copilot Chat 本身就支持登录 GitHub Copilot 账号，所以一
 
 | 名称                   | ID                                           | 介绍                                                             |
 | ---------------------- | -------------------------------------------- | ---------------------------------------------------------------- |
-| 全局网络设置           | `networkSettings`                            | 网络超时/重试设置，这些设置仅影响聊天请求。                      |
+| 全局网络设置           | `networkSettings`                            | 全局网络设置。超时与重试影响聊天请求；代理影响供应商 HTTP 请求。 |
 | 模型显示名称模板       | `modelDisplayNameTemplate`                   | 聊天模型名称模板。默认值：`{modelName}{{ ({providerName})}}`。   |
 | 余额刷新间隔           | `balanceRefreshIntervalMs`                   | 供应商余额的定时刷新间隔（毫秒）。                               |
 | 余额节流窗口           | `balanceThrottleWindowMs`                    | 请求后余额刷新的节流窗口（毫秒）。                               |
@@ -455,6 +455,54 @@ VS Code 的 Copilot Chat 本身就支持登录 GitHub Copilot 账号，所以一
 | 提交消息生成排除文件   | `commitMessageGeneration.excludeFiles`       | 用于从提交消息生成 prompt 中省略 diff 的 VS Code glob 文件模式。 |
 
 </details>
+
+### 代理配置
+
+代理可以通过 `unifyChatProvider.networkSettings.proxy` 全局配置，也可以通过 `unifyChatProvider.endpoints[].proxy` 为单个供应商配置。实际生效顺序为：
+
+1. 供应商 `proxy`
+2. 全局 `networkSettings.proxy`
+3. VS Code HTTP 代理设置
+
+`proxy.type` 支持：
+
+- `vscode`（默认）：使用 VS Code 的 `http.proxy`、`http.proxyAuthorization`、`http.proxyStrictSSL` 和 `http.noProxy`。
+- `direct`：直连，并绕过 VS Code 与全局代理设置。
+- `custom`：使用 `proxy.url`；可选字段包括 `authorization`、`strictSSL` 和 `noProxy`。
+
+自定义代理 URL 支持 `http`、`https`、`socks`、`socks4`、`socks4a`、`socks5` 和 `socks5h` 协议。代理设置会影响供应商 HTTP 请求，包括聊天请求、余额刷新和官方模型拉取。
+
+全局代理示例：
+
+```json
+{
+  "unifyChatProvider.networkSettings": {
+    "proxy": {
+      "type": "custom",
+      "url": "http://127.0.0.1:7890",
+      "noProxy": ["localhost", "127.0.0.1", ".example.com"]
+    }
+  }
+}
+```
+
+供应商覆盖示例：
+
+```json
+{
+  "unifyChatProvider.endpoints": [
+    {
+      "type": "openai",
+      "name": "OpenAI Direct",
+      "baseUrl": "https://api.openai.com",
+      "proxy": {
+        "type": "direct"
+      },
+      "models": ["gpt-5"]
+    }
+  ]
+}
+```
 
 ### 供应商参数
 
@@ -478,6 +526,7 @@ VS Code 的 Copilot Chat 本身就支持登录 GitHub Copilot 账号，所以一
 | 模型列表           | `models`                  | 模型配置数组（`ModelConfig[]`）。                                                                                        |
 | 额外 Header        | `extraHeaders`            | 会附加到每次请求的 HTTP Header（`Record<string, string>`）。                                                             |
 | 额外 Body 字段     | `extraBody`               | 会附加到请求 body 的额外字段（`Record<string, unknown>`），用于对齐供应商私有参数。                                      |
+| 代理配置           | `proxy`                   | 供应商级代理覆盖。请查看 [代理配置](#代理配置)。                                                                         |
 | 超时配置           | `timeout`                 | HTTP 请求与 SSE 流式的超时配置（毫秒）。                                                                                 |
 | 建连超时           | `timeout.connection`      | TCP 建立连接的最大等待时间；默认 `60000`（60 秒）。                                                                      |
 | 响应间隔超时       | `timeout.response`        | SSE 流式接收数据块之间的最大等待时间；默认 `300000`（5 分钟）。                                                          |

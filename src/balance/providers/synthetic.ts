@@ -137,6 +137,7 @@ export class SyntheticBalanceProvider implements BalanceProvider {
           'Accept': 'application/json',
         },
         logger,
+        proxy: input.provider.proxy,
       });
 
       if (!response.ok) {

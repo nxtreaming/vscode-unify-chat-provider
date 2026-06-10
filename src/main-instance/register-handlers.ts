@@ -515,6 +515,7 @@ function parseOfficialModelsFetchState(
         method,
         'state.lastConfigSignature.extraBodyHash',
       ),
+      proxyHash: parseOptionalString(signature['proxyHash']) ?? '',
     };
   }
 

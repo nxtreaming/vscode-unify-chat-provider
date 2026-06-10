@@ -62,6 +62,7 @@ export interface FetchConfigSignature {
   authHash: string;
   extraHeadersHash: string;
   extraBodyHash: string;
+  proxyHash: string;
 }
 
 /**
@@ -77,6 +78,7 @@ export interface OfficialModelsDraftInput {
   extraHeaders?: ProviderConfig['extraHeaders'];
   extraBody?: ProviderConfig['extraBody'];
   timeout?: ProviderConfig['timeout'];
+  proxy?: ProviderConfig['proxy'];
 }
 
 /**
@@ -982,6 +984,7 @@ export class OfficialModelsManager {
         stableStringify(input.extraHeaders ?? {}),
       ),
       extraBodyHash: this.hashString(stableStringify(input.extraBody ?? {})),
+      proxyHash: this.hashString(stableStringify(input.proxy ?? {})),
     };
   }
 
@@ -1036,6 +1039,7 @@ export class OfficialModelsManager {
       extraHeaders: input.extraHeaders,
       extraBody: input.extraBody,
       timeout: input.timeout,
+      proxy: input.proxy,
     };
 
     return { kind: 'ok', provider };
@@ -1249,6 +1253,7 @@ export class OfficialModelsManager {
         stableStringify(provider.extraHeaders ?? {}),
       ),
       extraBodyHash: this.hashString(stableStringify(provider.extraBody ?? {})),
+      proxyHash: this.hashString(stableStringify(provider.proxy ?? {})),
     };
   }
 
@@ -1312,6 +1317,7 @@ export class OfficialModelsManager {
           authHash: '',
           extraHeadersHash: '',
           extraBodyHash: '',
+          proxyHash: '',
         },
       };
       this.draftSessions.set(sessionId, session);
@@ -1381,7 +1387,8 @@ export class OfficialModelsManager {
       a.authMethod === b.authMethod &&
       a.authHash === b.authHash &&
       a.extraHeadersHash === b.extraHeadersHash &&
-      a.extraBodyHash === b.extraBodyHash
+      a.extraBodyHash === b.extraBodyHash &&
+      a.proxyHash === b.proxyHash
     );
   }
 

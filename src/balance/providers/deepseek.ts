@@ -224,6 +224,7 @@ export class DeepSeekBalanceProvider implements BalanceProvider {
           Accept: 'application/json',
         },
         logger,
+        proxy: input.provider.proxy,
       });
 
       if (!response.ok) {

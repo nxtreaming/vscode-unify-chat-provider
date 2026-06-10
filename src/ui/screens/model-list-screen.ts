@@ -739,6 +739,7 @@ function buildOfficialModelsDraftInput(
     extraHeaders: draft.extraHeaders,
     extraBody: draft.extraBody,
     timeout: draft.timeout,
+    proxy: draft.proxy,
   };
 }
 

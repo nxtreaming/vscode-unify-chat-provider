@@ -4,6 +4,7 @@ import { getToken } from '../../client/utils';
 import { showInput } from '../../ui/component';
 import { fetchWithRetry, normalizeBaseUrlInput } from '../../utils';
 import type { SecretStore } from '../../secret';
+import type { ProxyConfig } from '../../types';
 import type {
   BalanceMetric,
   BalanceConfig,
@@ -571,13 +572,20 @@ export class ClaudeRelayServiceBalanceProvider implements BalanceProvider {
     const baseUrl = resolveBaseUrl(this.config, input.provider.baseUrl);
 
     try {
-      const apiId = await this.fetchApiId(baseUrl, apiKey, logger);
+      const proxy = input.provider.proxy;
+      const apiId = await this.fetchApiId(baseUrl, apiKey, logger, proxy);
       const [userStats, dailyStats, weeklyStats, monthlyStats] =
         await Promise.all([
-          this.fetchUserStats(baseUrl, apiId, logger),
-          this.fetchUserModelStats(baseUrl, apiId, 'daily', logger),
-          this.fetchUserModelStats(baseUrl, apiId, 'natural_weekly', logger),
-          this.fetchUserModelStats(baseUrl, apiId, 'monthly', logger),
+          this.fetchUserStats(baseUrl, apiId, logger, proxy),
+          this.fetchUserModelStats(baseUrl, apiId, 'daily', logger, proxy),
+          this.fetchUserModelStats(
+            baseUrl,
+            apiId,
+            'natural_weekly',
+            logger,
+            proxy,
+          ),
+          this.fetchUserModelStats(baseUrl, apiId, 'monthly', logger, proxy),
         ]);
 
       const usage = this.aggregateUsage(userStats, {
@@ -722,6 +730,7 @@ export class ClaudeRelayServiceBalanceProvider implements BalanceProvider {
     baseUrl: string,
     apiKey: string,
     logger: ReturnType<typeof createSimpleHttpLogger>,
+    proxy: ProxyConfig | undefined,
   ): Promise<string> {
     const endpoint = createEndpoint(baseUrl, 'get-key-id');
     const response = await fetchWithRetry(endpoint, {
@@ -732,6 +741,7 @@ export class ClaudeRelayServiceBalanceProvider implements BalanceProvider {
       },
       body: JSON.stringify({ apiKey }),
       logger,
+      proxy,
     });
 
     if (!response.ok) {
@@ -782,6 +792,7 @@ export class ClaudeRelayServiceBalanceProvider implements BalanceProvider {
     baseUrl: string,
     apiId: string,
     logger: ReturnType<typeof createSimpleHttpLogger>,
+    proxy: ProxyConfig | undefined,
   ): Promise<CrsUserStatsPayload> {
     const endpoint = createEndpoint(baseUrl, 'user-stats');
     const response = await fetchWithRetry(endpoint, {
@@ -792,6 +803,7 @@ export class ClaudeRelayServiceBalanceProvider implements BalanceProvider {
       },
       body: JSON.stringify({ apiId }),
       logger,
+      proxy,
     });
 
     if (!response.ok) {
@@ -871,6 +883,7 @@ export class ClaudeRelayServiceBalanceProvider implements BalanceProvider {
     apiId: string,
     period: CrsModelStatsPeriod,
     logger: ReturnType<typeof createSimpleHttpLogger>,
+    proxy: ProxyConfig | undefined,
   ): Promise<CrsModelStatsPayload[]> {
     const endpoint = createEndpoint(baseUrl, 'user-model-stats');
     const response = await fetchWithRetry(endpoint, {
@@ -881,6 +894,7 @@ export class ClaudeRelayServiceBalanceProvider implements BalanceProvider {
       },
       body: JSON.stringify({ apiId, period }),
       logger,
+      proxy,
     });
 
     if (!response.ok) {

@@ -1,6 +1,11 @@
 import type { ConfigStore } from '../../config-store';
 import type { ProviderType } from '../../client/definitions';
-import { ProviderConfig, ModelConfig, TimeoutConfig } from '../../types';
+import {
+  ProviderConfig,
+  ModelConfig,
+  TimeoutConfig,
+  ProxyConfig,
+} from '../../types';
 import type { RetryConfig } from '../../utils';
 import type { WellKnownProviderConfig } from '../../well-known/providers';
 import type { OfficialModelsFetchState } from '../../official-models-manager';
@@ -99,6 +104,7 @@ export interface TimeoutFormRoute {
   kind: 'timeoutForm';
   timeout: TimeoutConfig;
   retry: RetryConfig;
+  proxy: ProxyConfig;
   draft: ProviderFormDraft;
 }
 

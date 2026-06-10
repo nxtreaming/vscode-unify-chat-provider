@@ -500,6 +500,7 @@ export class CodexBalanceProvider implements BalanceProvider {
             ...(accountId ? { 'ChatGPT-Account-Id': accountId } : {}),
           },
           logger,
+          proxy: input.provider.proxy,
         });
 
         if (!response.ok) {

@@ -441,7 +441,7 @@ Use this feature to monitor provider balances in `Provider Settings`.
 
 | Name                               | ID                                           | Description                                                                                           |
 | ---------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Global Network Settings            | `networkSettings`                            | Network timeout/retry settings, which only affect chat requests.                                      |
+| Global Network Settings            | `networkSettings`                            | Global network settings. Timeout and retry affect chat requests; proxy affects provider HTTP requests. |
 | Model Display Name Template        | `modelDisplayNameTemplate`                   | Template for chat model names. Default: `{modelName}{{ ({providerName})}}`.                           |
 | Balance Refresh Interval           | `balanceRefreshIntervalMs`                   | Periodic refresh interval for provider balances (milliseconds).                                       |
 | Balance Throttle Window            | `balanceThrottleWindowMs`                    | Throttle window for post-request balance refresh (milliseconds).                                      |
@@ -455,6 +455,54 @@ Use this feature to monitor provider balances in `Provider Settings`.
 | Commit Message Exclude Files       | `commitMessageGeneration.excludeFiles`       | VS Code glob patterns for files whose diffs should be omitted from commit message generation prompts. |
 
 </details>
+
+### Proxy Configuration
+
+Proxy settings can be configured globally through `unifyChatProvider.networkSettings.proxy` or per provider through `unifyChatProvider.endpoints[].proxy`. The effective order is:
+
+1. Provider `proxy`
+2. Global `networkSettings.proxy`
+3. VS Code HTTP proxy settings
+
+`proxy.type` supports:
+
+- `vscode` (default): Use VS Code `http.proxy`, `http.proxyAuthorization`, `http.proxyStrictSSL`, and `http.noProxy`.
+- `direct`: Connect directly and bypass VS Code/global proxy settings.
+- `custom`: Use `proxy.url`; optional fields are `authorization`, `strictSSL`, and `noProxy`.
+
+Supported custom proxy URL protocols are `http`, `https`, `socks`, `socks4`, `socks4a`, `socks5`, and `socks5h`. Proxy settings apply to provider HTTP requests, including chat requests, balance refreshes, and official model fetching.
+
+Example global proxy:
+
+```json
+{
+  "unifyChatProvider.networkSettings": {
+    "proxy": {
+      "type": "custom",
+      "url": "http://127.0.0.1:7890",
+      "noProxy": ["localhost", "127.0.0.1", ".example.com"]
+    }
+  }
+}
+```
+
+Example provider override:
+
+```json
+{
+  "unifyChatProvider.endpoints": [
+    {
+      "type": "openai",
+      "name": "OpenAI Direct",
+      "baseUrl": "https://api.openai.com",
+      "proxy": {
+        "type": "direct"
+      },
+      "models": ["gpt-5"]
+    }
+  ]
+}
+```
 
 ### Provider Parameters
 
@@ -478,6 +526,7 @@ The following fields correspond to `ProviderConfig` (field names used in import/
 | Models                      | `models`                  | Array of model configurations (`ModelConfig[]`).                                                                                                                 |
 | Extra Headers               | `extraHeaders`            | HTTP headers appended to every request (`Record<string, string>`).                                                                                               |
 | Extra Body Fields           | `extraBody`               | Extra fields appended to request body (`Record<string, unknown>`), for provider-specific parameters.                                                             |
+| Proxy                       | `proxy`                   | Provider-level proxy override. See [Proxy Configuration](#proxy-configuration).                                                                                  |
 | Timeout                     | `timeout`                 | Timeout settings for HTTP requests and SSE streaming (milliseconds).                                                                                             |
 | Connection Timeout          | `timeout.connection`      | Maximum time to wait for establishing a TCP connection; default `60000` (60 seconds).                                                                            |
 | Response Interval Timeout   | `timeout.response`        | Maximum time to wait between SSE chunks; default `300000` (5 minutes).                                                                                           |
