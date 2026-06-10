@@ -31,7 +31,12 @@ import {
 } from '../../official-models-manager';
 import { t } from '../../i18n';
 import { isSecretRef } from '../../secret';
-import { normalizeBaseUrlInput } from '../../utils';
+import {
+  isRawBaseUrlEnabled,
+  normalizeBaseUrlInput,
+  normalizeRawBaseUrlInput,
+  normalizeUseRawBaseUrl,
+} from '../../utils';
 
 /**
  * Ensure we have a session ID for draft-only state. Prefer the draft's
@@ -64,7 +69,10 @@ function getProviderForWellKnownModelMatching(
     return {
       type: draft.type,
       name,
-      baseUrl: normalizeBaseUrlInput(draft.baseUrl),
+      baseUrl: isRawBaseUrlEnabled(draft)
+        ? normalizeRawBaseUrlInput(draft.baseUrl)
+        : normalizeBaseUrlInput(draft.baseUrl),
+      useRawBaseUrl: normalizeUseRawBaseUrl(draft.useRawBaseUrl),
       models: [],
       extraHeaders: draft.extraHeaders,
       extraBody: draft.extraBody,
@@ -726,6 +734,7 @@ function buildOfficialModelsDraftInput(
     type: draft.type,
     name: draft.name,
     baseUrl: draft.baseUrl,
+    useRawBaseUrl: draft.useRawBaseUrl,
     auth: draft.auth,
     extraHeaders: draft.extraHeaders,
     extraBody: draft.extraBody,

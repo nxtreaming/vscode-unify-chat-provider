@@ -36,8 +36,10 @@ import {
   isCacheControlMarker,
   isImageMarker,
   isInternalMarker,
+  isRawBaseUrlEnabled,
   isUsageMarker,
   normalizeImageMimeType,
+  normalizeRawBaseUrlInput,
   resolveChatNetwork,
   resolveGoogleSdkTimeoutMs,
   sanitizeMessagesForModelSwitch,
@@ -103,6 +105,12 @@ export class GoogleAIStudioProvider implements ApiProvider {
   protected readonly apiVersion: string;
 
   constructor(protected readonly config: ProviderConfig) {
+    if (isRawBaseUrlEnabled(config)) {
+      this.baseUrl = normalizeRawBaseUrlInput(config.baseUrl);
+      this.apiVersion = 'v1beta';
+      return;
+    }
+
     const normalized = new URL(this.config.baseUrl);
     normalized.search = '';
     normalized.hash = '';

@@ -20,6 +20,7 @@ import {
   DEFAULT_CHAT_RETRY_CONFIG,
   describeNetworkError,
   isAbortLikeError,
+  isRawBaseUrlEnabled,
   isRetryableNetworkError,
   isRetryableStatusCode,
   resolveChatNetwork,
@@ -1238,6 +1239,10 @@ export abstract class GoogleCodeAssistProvider extends GoogleAIStudioProvider {
   }
 
   private normalizeEndpointBaseUrl(raw: string): string {
+    if (isRawBaseUrlEnabled(this.config)) {
+      return raw.trim();
+    }
+
     const trimmed = raw.trim().replace(/\/+$/, '');
     return trimmed.replace(/\/v1internal(?::.*)?$/i, '');
   }

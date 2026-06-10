@@ -24,7 +24,7 @@ import { mainInstance } from './index';
 import { PROVIDER_TYPES, type ProviderType } from '../client/definitions';
 import type { ModelConfig, TimeoutConfig } from '../types';
 import { normalizePresetTemplates } from '../preset-templates';
-import type { RetryConfig } from '../utils';
+import { normalizeUseRawBaseUrl, type RetryConfig } from '../utils';
 
 type OAuthWaitResult = { type: 'success'; url: string } | { type: 'cancel' };
 
@@ -385,6 +385,7 @@ function parseProviderConfig(value: unknown, method: string): ProviderConfig {
     type: typeRaw,
     name,
     baseUrl,
+    useRawBaseUrl: normalizeUseRawBaseUrl(record['useRawBaseUrl']),
     models: parseModels(record['models']),
     ...(transport ? { transport } : {}),
     ...(serviceTier ? { serviceTier } : {}),
@@ -493,6 +494,7 @@ function parseOfficialModelsFetchState(
         method,
         'state.lastConfigSignature.baseUrl',
       ),
+      useRawBaseUrl: signature['useRawBaseUrl'] === true,
       authMethod: requireString(
         signature['authMethod'],
         method,

@@ -14,7 +14,11 @@ import {
 import {
   normalizeConfiguredModelCapabilities,
 } from '../model-capabilities';
-import { normalizeBaseUrlInput } from '../utils';
+import {
+  isRawBaseUrlEnabled,
+  normalizeBaseUrlInput,
+  normalizeRawBaseUrlInput,
+} from '../utils';
 import { showValidationErrors } from './component';
 import type { BalanceMetric, BalanceSnapshot } from '../balance/types';
 import {
@@ -109,7 +113,9 @@ export function normalizeProviderDraft(
     ...rest,
     type: draft.type!,
     name: draft.name!.trim(),
-    baseUrl: normalizeBaseUrlInput(draft.baseUrl!),
+    baseUrl: isRawBaseUrlEnabled(draft)
+      ? normalizeRawBaseUrlInput(draft.baseUrl!)
+      : normalizeBaseUrlInput(draft.baseUrl!),
   };
 }
 

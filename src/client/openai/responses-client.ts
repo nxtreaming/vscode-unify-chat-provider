@@ -23,6 +23,7 @@ import {
   isCacheControlMarker,
   isImageMarker,
   isInternalMarker,
+  isRawBaseUrlEnabled,
   isUsageMarker,
   normalizeImageMimeType,
   resolveContextCacheConfig,
@@ -354,6 +355,7 @@ export class OpenAIResponsesProvider implements ApiProvider {
     return buildBaseUrl(config.baseUrl, {
       ensureSuffix: '/v1',
       skipSuffixIfMatch: /\/v\d+$/,
+      useRawBaseUrl: isRawBaseUrlEnabled(config),
     });
   }
 

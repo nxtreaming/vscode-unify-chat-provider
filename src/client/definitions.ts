@@ -323,12 +323,6 @@ export enum FeatureId {
    */
   OpenAIUseReasoningSplitParam = 'openai_use-reasoning-split-param',
   /**
-   * Use provider base URL as-is for OpenAI-compatible Chat Completion APIs.
-   *
-   * Useful for gateway-style endpoints whose base path is already fully routed.
-   */
-  OpenAIUseRawBaseUrl = 'openai_use-raw-base-url',
-  /**
    * @see https://ai.google.dev/gemini-api/docs/thinking?hl=zh-cn#levels-budgets
    */
   GeminiUseThinkingLevel = 'gemini_use-thinking-level',
@@ -713,13 +707,6 @@ export const FEATURES: Record<FeatureId, Feature> = {
         matchModelFamily(model.family ?? getBaseModelId(model.id), [
           'minimaxai/minimax-',
         ]),
-    ],
-  },
-  [FeatureId.OpenAIUseRawBaseUrl]: {
-    supportedProviders: [
-      'api.kilo.ai/api/gateway',
-      'qianfan.baidubce.com/v2/coding',
-      'wanqing.streamlakeapi.com/api/gateway/v1/endpoints',
     ],
   },
   [FeatureId.GeminiUseThinkingLevel]: {

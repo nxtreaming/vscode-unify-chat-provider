@@ -13,7 +13,7 @@ import type {
   ModelConfig,
   ProviderConfig,
 } from '../../types';
-import { isImageMarker } from '../../utils';
+import { isImageMarker, isRawBaseUrlEnabled } from '../../utils';
 import type { ApiProvider } from '../interface';
 import { buildBaseUrl } from '../utils';
 import { OpenAIChatCompletionProvider } from '../openai/chat-completion-client';
@@ -23,6 +23,10 @@ import type { ChatCompletionSnapshot } from 'openai/lib/ChatCompletionStream';
 import { buildOpencodeUserAgent } from '../../utils';
 
 function resolveCopilotApiBaseUrl(config: ProviderConfig): string {
+  if (isRawBaseUrlEnabled(config)) {
+    return buildBaseUrl(config.baseUrl, { useRawBaseUrl: true });
+  }
+
   const normalized = buildBaseUrl(config.baseUrl, { stripPattern: /\/v1$/ });
 
   const auth = config.auth;

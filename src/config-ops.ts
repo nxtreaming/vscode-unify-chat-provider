@@ -55,6 +55,7 @@ export const PROVIDER_CONFIG_KEYS = [
   'type',
   'name',
   'baseUrl',
+  'useRawBaseUrl',
   'transport',
   'serviceTier',
   'auth',

@@ -33,6 +33,7 @@ import {
   isCacheControlMarker,
   isImageMarker,
   isInternalMarker,
+  isRawBaseUrlEnabled,
   isUsageMarker,
   normalizeImageMimeType,
   resolveChatNetwork,
@@ -61,7 +62,10 @@ export class OllamaProvider implements ApiProvider {
   private readonly baseUrl: string;
 
   constructor(private readonly config: ProviderConfig) {
-    this.baseUrl = buildBaseUrl(config.baseUrl, { stripPattern: /\/api$/i });
+    this.baseUrl = buildBaseUrl(config.baseUrl, {
+      stripPattern: /\/api$/i,
+      useRawBaseUrl: isRawBaseUrlEnabled(config),
+    });
   }
 
   private buildHeaders(

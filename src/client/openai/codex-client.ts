@@ -5,6 +5,7 @@ import type { ProviderHttpLogger } from '../../logger';
 import {
   DEFAULT_NORMAL_TIMEOUT_CONFIG,
   FetchMode,
+  isRawBaseUrlEnabled,
   resolveChatNetwork,
   resolveOpenAISdkTimeoutMs,
 } from '../../utils';
@@ -313,6 +314,10 @@ export class OpenAICodexProvider extends OpenAIResponsesProvider {
   }
 
   protected override resolveWebSocketBaseUrl(client: OpenAI): string {
+    if (isRawBaseUrlEnabled(this.config)) {
+      return client.baseURL;
+    }
+
     return resolveCodexWebSocketBaseUrl(client.baseURL);
   }
 

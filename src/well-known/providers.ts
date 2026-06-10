@@ -758,6 +758,7 @@ export function resolveProviderModels(
     type: provider.type,
     name: provider.name,
     baseUrl: provider.baseUrl,
+    useRawBaseUrl: provider.useRawBaseUrl,
     models: [],
     balanceProvider: provider.balanceProvider,
     extraHeaders: provider.extraHeaders,

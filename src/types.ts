@@ -37,6 +37,8 @@ export interface ProviderConfig {
   name: string;
   /** Base URL for the API (e.g., https://api.anthropic.com) */
   baseUrl: string;
+  /** Use the configured base URL as-is instead of applying provider URL transforms. */
+  useRawBaseUrl?: boolean;
   /**
    * Preferred transport mode for this provider.
    *

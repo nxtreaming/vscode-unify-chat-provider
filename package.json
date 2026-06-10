@@ -452,6 +452,11 @@
                 "type": "string",
                 "description": "%configuration.endpoints.baseUrl.description%"
               },
+              "useRawBaseUrl": {
+                "type": "boolean",
+                "description": "%configuration.endpoints.useRawBaseUrl.description%",
+                "default": false
+              },
               "balanceProvider": {
                 "type": "object",
                 "description": "%configuration.endpoints.balanceProvider.description%",

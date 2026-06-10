@@ -27,6 +27,7 @@ import {
   isCacheControlMarker,
   isImageMarker,
   isInternalMarker,
+  isRawBaseUrlEnabled,
   isUsageMarker,
   encodeStatefulMarkerPart,
   decodeStatefulMarkerPart,
@@ -85,7 +86,10 @@ export class AnthropicProvider implements ApiProvider {
   private readonly baseUrl: string;
 
   constructor(protected readonly config: ProviderConfig) {
-    this.baseUrl = buildBaseUrl(config.baseUrl, { stripPattern: /\/v1$/i });
+    this.baseUrl = buildBaseUrl(config.baseUrl, {
+      stripPattern: /\/v1$/i,
+      useRawBaseUrl: isRawBaseUrlEnabled(config),
+    });
   }
 
   protected toProviderToolName(name: string): string {

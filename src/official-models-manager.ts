@@ -4,7 +4,12 @@ import { createProvider } from './client/utils';
 import { mergeWithWellKnownModels } from './well-known/models';
 import { stableStringify } from './config-ops';
 import { SecretStore } from './secret';
-import { normalizeBaseUrlInput } from './utils';
+import {
+  isRawBaseUrlEnabled,
+  normalizeBaseUrlInput,
+  normalizeRawBaseUrlInput,
+  normalizeUseRawBaseUrl,
+} from './utils';
 import { t } from './i18n';
 import type { AuthConfig, AuthCredential, AuthTokenInfo } from './auth/types';
 import { createAuthProvider, getAuthMethodCtor, type AuthManager } from './auth';
@@ -52,6 +57,7 @@ export interface OfficialModelsFetchState {
 export interface FetchConfigSignature {
   type: string;
   baseUrl: string;
+  useRawBaseUrl: boolean;
   authMethod: string;
   authHash: string;
   extraHeadersHash: string;
@@ -66,6 +72,7 @@ export interface OfficialModelsDraftInput {
   type?: ProviderConfig['type'];
   name?: string;
   baseUrl?: string;
+  useRawBaseUrl?: boolean;
   auth?: AuthConfig;
   extraHeaders?: ProviderConfig['extraHeaders'];
   extraBody?: ProviderConfig['extraBody'];
@@ -928,11 +935,16 @@ export class OfficialModelsManager {
     );
   }
 
-  private normalizeDraftBaseUrlForSignature(raw: string | undefined): string {
+  private normalizeDraftBaseUrlForSignature(
+    raw: string | undefined,
+    useRawBaseUrl: boolean,
+  ): string {
     const trimmed = raw?.trim() ?? '';
     if (!trimmed) return '';
     try {
-      return normalizeBaseUrlInput(trimmed);
+      return useRawBaseUrl
+        ? normalizeRawBaseUrlInput(trimmed)
+        : normalizeBaseUrlInput(trimmed);
     } catch {
       return trimmed;
     }
@@ -953,12 +965,17 @@ export class OfficialModelsManager {
   ): FetchConfigSignature {
     const auth = input.auth;
     const authMethod = auth?.method ?? 'none';
+    const useRawBaseUrl = isRawBaseUrlEnabled(input);
 
     const authHash = this.computeAuthHash(auth);
 
     return {
       type: input.type ?? '',
-      baseUrl: this.normalizeDraftBaseUrlForSignature(input.baseUrl),
+      baseUrl: this.normalizeDraftBaseUrlForSignature(
+        input.baseUrl,
+        useRawBaseUrl,
+      ),
+      useRawBaseUrl,
       authMethod,
       authHash,
       extraHeadersHash: this.hashString(
@@ -997,7 +1014,9 @@ export class OfficialModelsManager {
 
     let baseUrl: string;
     try {
-      baseUrl = normalizeBaseUrlInput(baseUrlRaw);
+      baseUrl = isRawBaseUrlEnabled(input)
+        ? normalizeRawBaseUrlInput(baseUrlRaw)
+        : normalizeBaseUrlInput(baseUrlRaw);
     } catch {
       return {
         kind: 'error',
@@ -1011,6 +1030,7 @@ export class OfficialModelsManager {
       type,
       name,
       baseUrl,
+      useRawBaseUrl: normalizeUseRawBaseUrl(input.useRawBaseUrl),
       auth: input.auth,
       models: [],
       extraHeaders: input.extraHeaders,
@@ -1222,6 +1242,7 @@ export class OfficialModelsManager {
     return {
       type: provider.type,
       baseUrl: provider.baseUrl,
+      useRawBaseUrl: isRawBaseUrlEnabled(provider),
       authMethod,
       authHash,
       extraHeadersHash: this.hashString(
@@ -1286,6 +1307,7 @@ export class OfficialModelsManager {
         configSignature: {
           type: '',
           baseUrl: '',
+          useRawBaseUrl: false,
           authMethod: 'none',
           authHash: '',
           extraHeadersHash: '',
@@ -1355,6 +1377,7 @@ export class OfficialModelsManager {
     return (
       a.type === b.type &&
       a.baseUrl === b.baseUrl &&
+      a.useRawBaseUrl === b.useRawBaseUrl &&
       a.authMethod === b.authMethod &&
       a.authHash === b.authHash &&
       a.extraHeadersHash === b.extraHeadersHash &&

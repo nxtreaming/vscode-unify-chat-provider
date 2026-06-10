@@ -19,6 +19,7 @@ import {
   fetchWithRetry,
   headersInitToRecord,
   normalizeBaseUrlInput,
+  normalizeRawBaseUrlInput,
   type RetryConfig,
 } from '../utils';
 import { FeatureId, FEATURES, PROVIDER_TYPES } from './definitions';
@@ -253,8 +254,14 @@ export function buildBaseUrl(
     ensureSuffix?: string;
     /** Skip adding ensureSuffix if URL matches this pattern */
     skipSuffixIfMatch?: RegExp;
+    /** Preserve user input except surrounding whitespace and URL validity checks. */
+    useRawBaseUrl?: boolean;
   },
 ): string {
+  if (options?.useRawBaseUrl) {
+    return normalizeRawBaseUrlInput(baseUrl);
+  }
+
   const normalized = normalizeBaseUrlInput(baseUrl);
 
   if (options?.stripPattern && options.stripPattern.test(normalized)) {

@@ -1698,6 +1698,25 @@ export function normalizeBaseUrlInput(raw: string): string {
   return normalized;
 }
 
+export function normalizeRawBaseUrlInput(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    throw new Error('Base URL is required');
+  }
+  new URL(trimmed);
+  return trimmed;
+}
+
+export function normalizeUseRawBaseUrl(raw: unknown): true | undefined {
+  return raw === true ? true : undefined;
+}
+
+export function isRawBaseUrlEnabled(
+  provider: Pick<ProviderConfig, 'useRawBaseUrl'>,
+): boolean {
+  return provider.useRawBaseUrl === true;
+}
+
 export function isCacheControlMarker(
   part: vscode.LanguageModelDataPart,
 ): boolean {

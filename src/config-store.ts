@@ -5,7 +5,12 @@ import {
   PROVIDER_CONFIG_KEYS,
   withoutKeys,
 } from './config-ops';
-import { normalizeBaseUrlInput } from './utils';
+import {
+  isRawBaseUrlEnabled,
+  normalizeBaseUrlInput,
+  normalizeRawBaseUrlInput,
+  normalizeUseRawBaseUrl,
+} from './utils';
 import { PROVIDER_KEYS, ProviderType } from './client/definitions';
 import { getRenamedProviderType } from './secret/migration';
 import { normalizePresetTemplates } from './preset-templates';
@@ -285,9 +290,12 @@ export class ConfigStore {
       return null;
     }
 
+    const useRawBaseUrl = normalizeUseRawBaseUrl(obj.useRawBaseUrl);
     let baseUrl: string;
     try {
-      baseUrl = normalizeBaseUrlInput(obj.baseUrl);
+      baseUrl = isRawBaseUrlEnabled({ useRawBaseUrl })
+        ? normalizeRawBaseUrlInput(obj.baseUrl)
+        : normalizeBaseUrlInput(obj.baseUrl);
     } catch {
       return null;
     }
@@ -326,6 +334,7 @@ export class ConfigStore {
       ] as const),
     );
 
+    provider.useRawBaseUrl = normalizeUseRawBaseUrl(provider.useRawBaseUrl);
     provider.transport = this.normalizeTransportMode(provider.transport);
     provider.serviceTier = this.normalizeServiceTier(provider.serviceTier);
     provider.extraHeaders = this.normalizeStringRecord(provider.extraHeaders);

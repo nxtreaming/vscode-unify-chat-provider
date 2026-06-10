@@ -6,6 +6,7 @@ import { ModelConfig, ProviderConfig } from '../../types';
 import {
   DEFAULT_NORMAL_TIMEOUT_CONFIG,
   FetchMode,
+  isRawBaseUrlEnabled,
   resolveChatNetwork,
   resolveGoogleSdkTimeoutMs,
 } from '../../utils';
@@ -41,11 +42,15 @@ export class VertexAIProvider extends GoogleAIStudioProvider {
   constructor(config: ProviderConfig) {
     super(config);
 
-    this.vertexApiVersion = this.parseApiVersionFromUrl(config.baseUrl);
+    this.vertexApiVersion = isRawBaseUrlEnabled(config)
+      ? undefined
+      : this.parseApiVersionFromUrl(config.baseUrl);
 
     // Parse project and location from baseUrl
     // Expected format: https://{location}-aiplatform.googleapis.com/{version}/projects/{project}/locations/{location}
-    const parsed = this.parseVertexUrl(config.baseUrl);
+    const parsed = isRawBaseUrlEnabled(config)
+      ? {}
+      : this.parseVertexUrl(config.baseUrl);
     this.vertexProject = parsed.project;
     this.vertexLocation = parsed.location;
     this.vertexBaseDomain = parsed.baseDomain;

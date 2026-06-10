@@ -23,6 +23,7 @@ import {
   isCacheControlMarker,
   isImageMarker,
   isInternalMarker,
+  isRawBaseUrlEnabled,
   isUsageMarker,
   normalizeImageMimeType,
   parseThinkingTags,
@@ -43,7 +44,6 @@ import {
   getTokenType,
   getUnifiedUserAgent,
   isFeatureSupported,
-  isFeatureSupportedByProvider,
   mergeHeaders,
   normalizeToolInputSchema,
   parseToolArguments,
@@ -115,13 +115,10 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
   }
 
   protected resolveBaseUrl(config: ProviderConfig): string {
-    if (isFeatureSupportedByProvider(FeatureId.OpenAIUseRawBaseUrl, config)) {
-      return buildBaseUrl(config.baseUrl);
-    }
-
     return buildBaseUrl(config.baseUrl, {
       ensureSuffix: '/v1',
       skipSuffixIfMatch: /\/v\d+$/,
+      useRawBaseUrl: isRawBaseUrlEnabled(config),
     });
   }
 

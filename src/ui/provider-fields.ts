@@ -3,7 +3,6 @@ import { t } from '../i18n';
 import { ConfigStore } from '../config-store';
 import type { FormSchema, FieldContext } from './field-schema';
 import {
-  validateBaseUrl,
   ensureDraftSessionId,
   normalizeProviderDraft,
   validateProviderNameUnique,
@@ -12,7 +11,10 @@ import {
 import {
   DEFAULT_CONTEXT_CACHE_TTL_SECONDS,
   DEFAULT_CONTEXT_CACHE_TYPE,
+  isRawBaseUrlEnabled,
   normalizeBaseUrlInput,
+  normalizeRawBaseUrlInput,
+  normalizeUseRawBaseUrl,
   resolveContextCacheConfig,
 } from '../utils';
 import { ProviderType, PROVIDER_TYPES } from '../client/definitions';
@@ -66,6 +68,123 @@ function getTransportModeDescription(draft: ProviderFormDraft): string {
       return t('WebSocket');
     default:
       return t('Default');
+  }
+}
+
+function normalizeProviderBaseUrlForMode(
+  value: string,
+  useRawBaseUrl: boolean | undefined,
+): string {
+  return useRawBaseUrl
+    ? normalizeRawBaseUrlInput(value)
+    : normalizeBaseUrlInput(value);
+}
+
+async function editBaseUrl(draft: ProviderFormDraft): Promise<void> {
+  const inputBox = vscode.window.createInputBox();
+  inputBox.title = t('API Base URL');
+  inputBox.value = draft.baseUrl ?? '';
+  inputBox.placeholder = t('e.g., https://api.example.com');
+  inputBox.ignoreFocusOut = false;
+
+  let useRawBaseUrl = isRawBaseUrlEnabled(draft);
+
+  const updatePrompt = () => {
+    inputBox.prompt = useRawBaseUrl
+      ? t('Enter the API base URL (automatic URL normalization disabled)')
+      : t('Enter the API base URL (automatic URL normalization enabled)');
+  };
+
+  const updateValidation = () => {
+    try {
+      normalizeProviderBaseUrlForMode(inputBox.value, useRawBaseUrl);
+      inputBox.validationMessage = undefined;
+    } catch {
+      inputBox.validationMessage = t('Please enter a valid base URL');
+    }
+  };
+
+  const autoButton: vscode.QuickInputButton = {
+    iconPath: new vscode.ThemeIcon('beaker'),
+    tooltip: t('Automatic URL normalization enabled'),
+  };
+  const rawButton: vscode.QuickInputButton = {
+    iconPath: new vscode.ThemeIcon('beaker-stop'),
+    tooltip: t('Automatic URL normalization disabled'),
+  };
+
+  const updateButtons = () => {
+    inputBox.buttons = [useRawBaseUrl ? rawButton : autoButton];
+  };
+
+  const updateMode = () => {
+    updatePrompt();
+    updateButtons();
+    updateValidation();
+  };
+
+  updateMode();
+
+  const result = await new Promise<
+    | { baseUrl: string; useRawBaseUrl: boolean }
+    | undefined
+  >((resolve) => {
+    let resolved = false;
+
+    const finish = (
+      value: { baseUrl: string; useRawBaseUrl: boolean } | undefined,
+    ) => {
+      if (resolved) return;
+      resolved = true;
+      resolve(value);
+    };
+
+    inputBox.onDidChangeValue(() => {
+      updateValidation();
+    });
+
+    inputBox.onDidTriggerButton((button) => {
+      if (button !== autoButton && button !== rawButton) {
+        return;
+      }
+      useRawBaseUrl = !useRawBaseUrl;
+      updateMode();
+    });
+
+    inputBox.onDidAccept(() => {
+      if (inputBox.validationMessage) {
+        return;
+      }
+
+      let baseUrl: string;
+      try {
+        baseUrl = normalizeProviderBaseUrlForMode(
+          inputBox.value,
+          useRawBaseUrl,
+        );
+      } catch {
+        inputBox.validationMessage = t('Please enter a valid base URL');
+        return;
+      }
+
+      finish({
+        baseUrl,
+        useRawBaseUrl,
+      });
+      inputBox.hide();
+    });
+
+    inputBox.onDidHide(() => {
+      finish(undefined);
+      inputBox.dispose();
+    });
+
+    inputBox.show();
+  });
+
+  if (result) {
+    draft.baseUrl = result.baseUrl;
+    draft.useRawBaseUrl = normalizeUseRawBaseUrl(result.useRawBaseUrl);
   }
 }
 
@@ -168,16 +287,18 @@ export const providerFormSchema: FormSchema<ProviderFormDraft> = {
     // Base URL field
     {
       key: 'baseUrl',
-      type: 'text',
+      type: 'custom',
       label: t('API Base URL'),
       icon: 'globe',
       section: 'primary',
-      prompt: t('Enter the API base URL'),
-      placeholder: t('e.g., https://api.example.com'),
-      required: true,
-      validate: (value) => validateBaseUrl(value),
-      transform: (value) => normalizeBaseUrlInput(value),
+      edit: async (draft) => {
+        await editBaseUrl(draft);
+      },
       getDescription: (draft) => draft.baseUrl || t('(required)'),
+      getDetail: (draft) =>
+        isRawBaseUrlEnabled(draft)
+          ? t('Automatic URL normalization disabled')
+          : t('Automatic URL handling'),
     },
     {
       key: 'transport',
