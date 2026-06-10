@@ -1,5 +1,14 @@
 # Changelog
 
+## v7.1.2 - 2026-06-10
+
+### Features
+- add Tencent Cloud TokenHub, revamp Alibaba providers, add new models (d4637be, SmallMain)
+
+### Fixes
+- rename thinking mode options to 'Thinking' and 'Non-Thinking' (c4fcb67, SmallMain)
+- update Gemini model aliases and enable Gemma 4 thinking effort (14008b8, SmallMain)
+
 ## v7.1.1 - 2026-06-10
 
 ### Fixes
