@@ -42,8 +42,12 @@ export function normalizeGeminiCliOAuthType(
 }
 
 export function getGeminiCliOAuthScopes(
-  _oauthType: string | undefined,
+  oauthType: string | undefined,
 ): readonly string[] {
+  const normalized = normalizeGeminiCliOAuthType(oauthType);
+  if (normalized === 'ai_studio') {
+    return GEMINI_CLI_AI_STUDIO_SCOPES;
+  }
   return GEMINI_CLI_SCOPES;
 }
 
