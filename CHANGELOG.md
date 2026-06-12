@@ -1,5 +1,10 @@
 # Changelog
 
+## v7.4.0 - 2026-06-12
+
+### Features
+- add Grok 4.3, Grok Build 0.1, and Composer 2.5 models (bfdf459, SmallMain)
+
 ## v7.3.0 - 2026-06-12
 
 ### Features
