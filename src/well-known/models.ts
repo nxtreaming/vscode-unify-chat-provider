@@ -2346,6 +2346,20 @@ const _WELL_KNOWN_MODELS = [
     temperature: 1.0,
   },
   {
+    id: 'kimi-k2.7-code',
+    name: 'Kimi K2.7 Code',
+    maxInputTokens: 256000,
+    maxOutputTokens: 128000,
+    stream: true,
+    thinking: {
+      type: 'enabled',
+    },
+    capabilities: {
+      toolCalling: true,
+      imageInput: true,
+    },
+  },
+  {
     id: 'kimi-k2.6',
     overrides: [
       {
@@ -2371,7 +2385,7 @@ const _WELL_KNOWN_MODELS = [
       },
     ],
     name: 'Kimi K2.6',
-    maxInputTokens: 262144,
+    maxInputTokens: 256000,
     maxOutputTokens: 128000,
     stream: true,
     thinking: {
@@ -2412,7 +2426,7 @@ const _WELL_KNOWN_MODELS = [
       },
     ],
     name: 'Kimi K2.5',
-    maxInputTokens: 262144,
+    maxInputTokens: 256000,
     maxOutputTokens: 128000,
     stream: true,
     thinking: {

@@ -599,7 +599,7 @@ export const WELL_KNOWN_PROVIDERS: WellKnownProviderConfig[] = [
     baseUrl: 'https://api.moonshot.cn',
     balanceProvider: { method: 'moonshot-ai' },
     authTypes: ['api-key'],
-    models: ['kimi-k2.6', 'kimi-k2.5'],
+    models: ['kimi-k2.7-code', 'kimi-k2.6'],
   },
   {
     name: 'Moonshot AI (International)',
@@ -608,7 +608,7 @@ export const WELL_KNOWN_PROVIDERS: WellKnownProviderConfig[] = [
     baseUrl: 'https://api.moonshot.ai',
     balanceProvider: { method: 'moonshot-ai' },
     authTypes: ['api-key'],
-    models: ['kimi-k2.6', 'kimi-k2.5'],
+    models: ['kimi-k2.7-code', 'kimi-k2.6'],
   },
   {
     name: 'Moonshot AI (Coding Plan)',
