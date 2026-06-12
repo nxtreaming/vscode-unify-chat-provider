@@ -32,7 +32,7 @@ Integrate multiple LLM API providers into VS Code's GitHub Copilot Chat using th
 - 📦 **Out of the Box**: One-click configuration, or one-click migration from mainstream applications and extensions, with automatic syncing of official model lists, no tedious operations required.
 - 💾 **Import and Export**: Complete import/export support; import existing configs via Base64, JSON, URL, or URI.
 - 💎 **Great UX**: Visual interface configuration, fully open model parameters, supports unlimited provider and model configurations, and supports coexistence of multiple configuration variants for the same provider and model.
-- ✨ **One More Thing**: One-click use of your Claude Code, Gemini CLI, Antigravity, Github Copilot, OpenAI Codex (ChatGPT Plus/Pro) account quotas.
+- ✨ **One More Thing**: One-click use of your Claude Code, Gemini CLI, Antigravity, Github Copilot, OpenAI Codex (ChatGPT Plus/Pro), xAI Grok (SuperGrok / X Premium+) account quotas.
 
 ## Installation
 
@@ -798,14 +798,15 @@ Experimental Supported Providers:
 > - Your account may be suspended or permanently banned.
 > - You need to accept the risks yourself; all risks are borne by you.
 
-| Provider                                               | Free Quota                     | Balance Monitor |
-| :----------------------------------------------------- | :----------------------------- | :-------------: |
-| [OpenAI Codex (ChatGPT Plus/Pro)](https://openai.com/) |                                |       ✅        |
-| [GitHub Copilot](https://github.com/features/copilot)  | [Details](#github-copilot)     |
-| [Google Antigravity](https://antigravity.google/)      | [Details](#google-antigravity) |       ✅        |
-| [Google Gemini CLI](https://geminicli.com/)            | [Details](#google-gemini-cli)  |       ✅        |
-| [Claude Code](https://claude.ai/)                      |                                |
-| [Synthetic](https://synthetic.new/)                    | [Details](#synthetic)          |       ✅        |
+| Provider                                                     | Free Quota                     | Balance Monitor |
+| :----------------------------------------------------------- | :----------------------------- | :-------------: |
+| [OpenAI Codex (ChatGPT Plus/Pro)](https://openai.com/)       |                                |       ✅        |
+| [xAI Grok Build (SuperGrok / X Premium+)](https://grok.com/) |                                |
+| [GitHub Copilot](https://github.com/features/copilot)        | [Details](#github-copilot)     |
+| [Google Antigravity](https://antigravity.google/)            | [Details](#google-antigravity) |       ✅        |
+| [Google Gemini CLI](https://geminicli.com/)                  | [Details](#google-gemini-cli)  |       ✅        |
+| [Claude Code](https://claude.ai/)                            |                                |
+| [Synthetic](https://synthetic.new/)                          | [Details](#synthetic)          |       ✅        |
 
 Long-Term Free Quotas:
 

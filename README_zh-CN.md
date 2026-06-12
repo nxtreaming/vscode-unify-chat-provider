@@ -32,7 +32,7 @@ Unify Chat Provider
 - 📦 **开箱即用**：一键配置，或从主流应用和扩展一键迁移，支持自动同步官方模型列表，无需繁琐操作。
 - 💾 **导入导出**：拥有完善的导入和导出功能，支持多种方式（Base64、JSON、URL、URI）导入已有配置。
 - 💎 **极致体验**：可视化界面配置，模型参数完全开放，支持无限供应商及模型配置，支持同供应商及模型多个配置变体共存。
-- ✨ **One More Thing**：一键使用你的 Claude Code、Gemini CLI、Antigravity、Github Copilot、OpenAI Codex (ChatGPT Plus/Pro) 账号配额。
+- ✨ **One More Thing**：一键使用你的 Claude Code、Gemini CLI、Antigravity、Github Copilot、OpenAI Codex (ChatGPT Plus/Pro)、xAI Grok (SuperGrok / X Premium+) 账号配额。
 
 ## 安装
 
@@ -798,14 +798,15 @@ vscode://SmallMain.vscode-unify-chat-provider/import-config?config=<input>&auth=
 > - 你的账户可能会被暂停或永久封禁。
 > - 你需要自行权衡，所有风险都将由你自己承担。
 
-| 供应商                                                 | 免费额度                    | 余额监控 |
-| :----------------------------------------------------- | --------------------------- | :------: |
-| [OpenAI Codex (ChatGPT Plus/Pro)](https://openai.com/) |                             |    ✅    |
-| [GitHub Copilot](https://github.com/features/copilot)  | [详情](#github-copilot)     |
-| [Google Antigravity](https://antigravity.google/)      | [详情](#google-antigravity) |    ✅    |
-| [Google Gemini CLI](https://geminicli.com/)            | [详情](#google-gemini-cli)  |    ✅    |
-| [Claude Code](https://claude.ai/)                      |                             |
-| [Synthetic](https://synthetic.new/)                    | [详情](#synthetic)          |    ✅    |
+| 供应商                                                       | 免费额度                    | 余额监控 |
+| :----------------------------------------------------------- | --------------------------- | :------: |
+| [OpenAI Codex (ChatGPT Plus/Pro)](https://openai.com/)       |                             |    ✅    |
+| [xAI Grok Build (SuperGrok / X Premium+)](https://grok.com/) |                             |
+| [GitHub Copilot](https://github.com/features/copilot)        | [详情](#github-copilot)     |
+| [Google Antigravity](https://antigravity.google/)            | [详情](#google-antigravity) |    ✅    |
+| [Google Gemini CLI](https://geminicli.com/)                  | [详情](#google-gemini-cli)  |    ✅    |
+| [Claude Code](https://claude.ai/)                            |                             |
+| [Synthetic](https://synthetic.new/)                          | [详情](#synthetic)          |    ✅    |
 
 长期免费额度：
 

@@ -692,9 +692,9 @@ export const WELL_KNOWN_PROVIDERS: WellKnownProviderConfig[] = [
     autoFetchOfficialModels: true,
   },
   {
-    name: 'xAI Grok OAuth (SuperGrok / X Premium+)',
+    name: 'xAI Grok Build (SuperGrok / X Premium+)',
     category: 'Experimental',
-    type: 'xai-grok-oauth',
+    type: 'xai-grok-build',
     baseUrl: 'https://api.x.ai',
     authTypes: ['xai-grok-oauth'],
     models: [],

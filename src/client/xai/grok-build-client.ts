@@ -1,12 +1,10 @@
 import OpenAI from 'openai';
 import * as vscode from 'vscode';
 import type { AuthTokenInfo } from '../../auth/types';
-import {
-  isRawBaseUrlEnabled,
-} from '../../utils';
+import { isRawBaseUrlEnabled } from '../../utils';
 import type { ModelConfig } from '../../types';
 import { getToken } from '../utils';
-import { OpenAIResponsesProvider } from './responses-client';
+import { OpenAIResponsesProvider } from '../openai/responses-client';
 import { randomUUID } from 'crypto';
 
 const XAI_GROK_SOURCE = 'vscode-unify-chat-provider';
@@ -45,7 +43,7 @@ function setHeaderIfMissing(
   }
 }
 
-export class XaiGrokOAuthProvider extends OpenAIResponsesProvider {
+export class XaiGrokBuildProvider extends OpenAIResponsesProvider {
   protected override buildHeaders(
     sessionId: string,
     credential?: AuthTokenInfo,
@@ -80,7 +78,12 @@ export class XaiGrokOAuthProvider extends OpenAIResponsesProvider {
     modelConfig?: ModelConfig,
     messages?: readonly vscode.LanguageModelChatRequestMessage[],
   ): Record<string, string> {
-    const headers = this.buildHeaders(sessionId, credential, modelConfig, messages);
+    const headers = this.buildHeaders(
+      sessionId,
+      credential,
+      modelConfig,
+      messages,
+    );
     deleteHeaderVariants(headers, 'x-api-key');
     deleteHeaderVariants(headers, 'openai-beta');
     setHeaderIfMissing(headers, 'openai-beta', XAI_RESPONSES_HTTP_BETA);

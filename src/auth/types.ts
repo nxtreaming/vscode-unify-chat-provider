@@ -235,8 +235,7 @@ export interface GoogleVertexAIAdcConfig extends GoogleVertexAIAuthBaseConfig {
 /**
  * Service Account JSON key file configuration
  */
-export interface GoogleVertexAIServiceAccountConfig
-  extends GoogleVertexAIAuthBaseConfig {
+export interface GoogleVertexAIServiceAccountConfig extends GoogleVertexAIAuthBaseConfig {
   subType: 'service-account';
   /** Path to service account JSON key file */
   keyFilePath: string;
@@ -249,8 +248,7 @@ export interface GoogleVertexAIServiceAccountConfig
 /**
  * API Key configuration (for Vertex AI Express Mode)
  */
-export interface GoogleVertexAIApiKeyConfig
-  extends GoogleVertexAIAuthBaseConfig {
+export interface GoogleVertexAIApiKeyConfig extends GoogleVertexAIAuthBaseConfig {
   subType: 'api-key';
   /** API key value or secret reference */
   apiKey?: string;

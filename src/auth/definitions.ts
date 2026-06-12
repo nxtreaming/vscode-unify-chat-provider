@@ -8,7 +8,7 @@ import { GitHubCopilotAuthProvider } from './providers/github-copilot';
 import { GoogleVertexAIAuthProvider } from './providers/google-vertex-ai-auth';
 import { ClaudeCodeAuthProvider } from './providers/claude-code';
 import { OpenAICodexAuthProvider } from './providers/openai-codex';
-import { XaiGrokOAuthProvider } from './providers/xai-grok-oauth';
+import { XaiGrokOAuthProvider } from './providers/xai-grok-build';
 import { OAuth2AuthProvider } from './providers/oauth2';
 import { AuthConfig } from './types';
 
@@ -96,8 +96,10 @@ export const AUTH_METHODS = {
   },
   'xai-grok-oauth': {
     id: 'xai-grok-oauth',
-    label: t('xAI Grok OAuth (SuperGrok)'),
-    description: t('Authenticate using xAI Grok OAuth (SuperGrok / X Premium+)'),
+    label: t('xAI Grok'),
+    description: t(
+      'Authenticate using xAI Grok OAuth (SuperGrok / X Premium+)',
+    ),
     category: 'Experimental',
     ctor: XaiGrokOAuthProvider,
   },
