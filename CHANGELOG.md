@@ -1,5 +1,10 @@
 # Changelog
 
+## v7.4.2 - 2026-06-12
+
+### Fixes
+- remove max tokens config from Grok Composer 2.5 Fast (d4db31f, SmallMain)
+
 ## v7.4.1 - 2026-06-12
 
 ### Fixes
