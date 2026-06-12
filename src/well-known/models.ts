@@ -4231,8 +4231,6 @@ const _WELL_KNOWN_MODELS = [
         matchers: ['api.x.ai'],
         config: {
           id: 'grok-composer-2.5-fast',
-          maxInputTokens: 131072,
-          maxOutputTokens: 32768,
         },
       },
     ],
